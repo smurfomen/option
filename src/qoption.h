@@ -42,6 +42,8 @@
 template <typename T>
 class QOption {
 public:
+#define none None()
+#define some(val) Some(val);
 
     ///\brief Create QOption None value
     static QOption<T> None(){
@@ -49,17 +51,17 @@ public:
     }
 
     ///\brief Create QOption Some value use copy val into QOption value
-    static QOption<T> Some(T & val) {
+    static QOption<T> Some(const T & val) {
         return QOption<T>(val);
     }
 
-    ///\brief Create QOption Some value use move val into QOption value
-    static QOption<T> Some(T && val) {
+    ///\brief Create QOption Some value use copy val into QOption value
+    static QOption<T> Some(T & val) {
         return QOption<T>(std::move(val));
     }
 
     bool operator==(const QOption<T> & o){
-        return isSome() == o.isSome() && ((isSome() && unwrap() == o.unwrap()) || isNone());
+        return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
     }
 
     QOption<T> & operator=(QOption<T> & o){
@@ -69,10 +71,36 @@ public:
     }
 
     ///\brief Returns true if None
-    bool isNone() { return !available; }
+    bool isNone() const { return !available; }
 
     ///\brief Returns true if Some
-    bool isSome() { return available; }
+    bool isSome() const { return available; }
+
+    ///\brief Returns value if Some, or throws std::logic_error exception if None
+    const T & unwrap() {
+        return unwrap<std::logic_error>();
+    }
+
+    ///\brief Returns value if Some, or throws std::logic_error exception with text message if None
+    const T & expect (const QString & text) {
+        return expect<std::logic_error>(text);
+    }
+
+    ///\brief Returns value if Some, or throws E type exception if None
+    template< typename E = std::logic_error>
+    const T & unwrap() {
+        if(isSome())
+            return value;
+        throw E("Option is None value");
+    }
+
+    ///\brief Returns value if Some, or E type exception with text message if None
+    template <typename E = std::logic_error>
+    const T & expect (const QString & text) {
+        if(isSome())
+            return value;
+        throw E(text.toStdString().c_str());
+    }
 
     ///\brief Returns value if Some, or call foo and returns def_value if None
     template<typename Fun>
@@ -81,7 +109,7 @@ public:
             return value;
 
         foo();
-        value = def_value;
+        value = std::move(def_value);
         return value;
     }
 
@@ -89,44 +117,16 @@ public:
     const T & unwrap_def(T def_value) {
         if(isSome())
             return value;
-        return def_value;
-    }
-
-    ///\brief Returns value if Some, or throws std::logic_error exception if None
-    const T & unwrap() {
-        return unwrap<std::logic_error>();
-    }
-
-    ///\brief Returns value if Some, or throws E type exception if None
-    template< typename E = std::logic_error>
-    const T & unwrap() {
-       if(isSome())
-           return value;
-       throw E("Option is None value");
-    }
-
-    ///\brief Returns value if Some, or throws std::logic_error exception with text message if None
-    const T & expect (const QString & text) {
-        return expect<std::logic_error>(text);
-    }
-
-    ///\brief Returns value if Some, or E type exception with text message if None
-    template <typename E = std::logic_error>
-    const T & expect (const QString & text) {
-        try {
-            return unwrap<E>();
-        } catch (E & e) { }
-
-        throw E(text.toStdString().c_str());
+        value = std::move(def_value);
+        return value;
     }
 
 private:
     QOption() {
-        value = T();
         available = false;
     }
 
-    QOption(T & t) {
+    QOption(const T & t){
         value = t;
         available = true;
     }
@@ -140,7 +140,7 @@ private:
     bool available {false};
 
     ///\brief Упакованное значение
-    T value = T();
+    T value;
 };
 
 #endif // QOPTION_H
