@@ -51,18 +51,16 @@
 
     // 8. Match result and handle it with custom handlers
     MyClass * request = ...';
-    bool success = getObject().match(
-                Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
+    bool success = getObject().match<bool>(
+                [&](MyClass * pack) -> bool{
                     return pack->export() && HandleResponse(pack);
-                }),
+                },
 
-                Q_NONE(bool) impl ([&]{
+                [&]() -> bool {
                     request->setLineStatus(timeout);
                     return false;
-                })
+                }
             );
-
-
 */
 
 ///\brief Container for necessarily error handling of returned results
