@@ -19,6 +19,7 @@ int main(int argc, char *argv[])
 
     // after copy or moving first statement will be None
     auto second = std::move(first);
+
     // first.unwrap() - throws exception
     qDebug()<<tmr.elapsed();
 

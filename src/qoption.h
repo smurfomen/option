@@ -129,13 +129,6 @@ public:
         return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
     }
 
-    QOption<value_type> & operator=(const QOption<value_type> & o){
-        value = o.value;
-        available = o.available;
-        o.available = false;
-        return *this;
-    }
-
     QOption<value_type> & operator=(QOption<value_type> && o){
         value = std::move(o.value);
         available = o.available;
@@ -153,9 +146,9 @@ public:
         return QOption<T>(val);
     }
 
-    ///\brief Create QOption Some value use move val into QOption value
+    ///\brief Create QOption Some value use forwarding val into QOption value
     static QOption<T> Some(T && val) {
-        return QOption<T>(std::move(val));
+        return QOption<T>(std::forward<T>(val));
     }
 
     ///\brief Returns true if statement is None
@@ -229,6 +222,13 @@ public:
     }
 
 private:
+
+    QOption<value_type> & operator=(const QOption<value_type> & o){
+        value = o.value;
+        available = o.available;
+        return *this;
+    }
+
     ///\brief Статус валидности
     bool available {false};
 
