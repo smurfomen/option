@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     QCoreApplication * ptr_a = &a;
     int dsa = 110;
-    auto none_opt = QOption<int>::none;
+    auto none_opt = QOption<int>::NONE;
 
     auto opt_55 =  QOption<int>::Some(55);
     auto dsa_opt = QOption<int>::Some(dsa);

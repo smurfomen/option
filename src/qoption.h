@@ -1,49 +1,58 @@
 #ifndef QOPTION_H
 #define QOPTION_H
 #include <QString>
-#include <functional>
+
 ///\module Option:
-/// Плохой пример
+///
+///\details Creation:
+/// Bad way:
+///\code
 /* MyClass * getMyClass() {
      if(expression)
         return new MyClass(args..);
      else
         return nullptr;
    }                                                     */
-/// Хорощий пример
+/// Good way for example:
 /// \code
 /* Option<MyClass*> getMyClass() {
      if(expression)
         return Option<MyClass*>::Some(new MyClass(args..));
      else
-        return Option<MyClass*>::None();
+        return Option<MyClass*>::NONE;
    }                                                   */
 ///
-/// Варианты применения Option:
+///
+/// QOption error handling use-cases:
 ///\code
-/*  // 1. Проверка перед использованием
+/*  // 1. Check before use
     auto o_mc = getMyClass();
     if(o_mc.isSome())
         o_mc.unwrap()->myClassFoo(args..);
 
-    // 2. Получение значения или выброс исключения
+    // 2. Get a value or throwing std::logic_error type exception
     MyClass * mc = getMyClass().unwrap();
 
-    // 3. Получение значения или выброс исключения с сообщением об ошибке
-    MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
-
-    // 4. Получение значения или выброс исключения MyCustomException
+    // 3. Get a value or throwing MyCustomException
     MyClass * mc = getMyClass().unwrap<MyCustomException>();
 
-    // 5. Получение значения или выброс исключения MyCustomException с сообщением об ошибке
+    // 4. Get some value or default value if QOption is not Some
+    QString connection = createConnectionString(params).unwrap_def("something connection string");
+
+    // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
+    QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
+
+    // 6. Get some value or throwing std::logic_error type exception with an error message
+    MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+
+    // 7. Get some value or throwing MyCustomException with an error message
     MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");    */
 
-///\brief Контейнер для обязательной обработки ошибок возвращаемых результатов
+///\brief Container for necessarily error handling of returned results
 template <typename T>
 class QOption {
 public:
-#define none None()
-#define some(val) Some(val);
+#define NONE None()
 
     ///\brief Create QOption None value
     static QOption<T> None(){
@@ -59,6 +68,7 @@ public:
     static QOption<T> Some(T & val) {
         return QOption<T>(std::move(val));
     }
+
 
     bool operator==(const QOption<T> & o){
         return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
