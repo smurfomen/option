@@ -131,7 +131,7 @@ public:
 
     ///\brief Returns value if Some, or returns result of call none_handler if statement is None
     ///\arg     none_handler - std::function<value_type()> object - must not provide args and returns \e value_type value
-    const value_type & unwrap_or(std::function<value_type()> none_handler){
+    const value_type & unwrap_or(const std::function<value_type()> & none_handler){
         if(isSome())
             return value;
         return std::move(none_handler());
@@ -143,7 +143,7 @@ public:
     ///
     ///\warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
     template<typename Res>
-    Res match(std::function<Res(value_type)> some_handler, std::function<Res()>  none_handler){
+    Res match(const std::function<Res(value_type)> & some_handler, const std::function<Res()> & none_handler){
         if(isSome())
             return some_handler(value);
         else
