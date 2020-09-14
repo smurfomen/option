@@ -131,15 +131,12 @@ public:
         throw E(text.toStdString().c_str());
     }
 
-    ///\brief Returns value if Some, or call foo and returns def_value if None
-    template<typename Fun>
-    const T & unwrap_or(T def_value, const Fun & foo){
+
+    ///\brief Returns value if Some, or returns result of call none_handling if value is None
+    const T & unwrap_or(Q_NONE(T) none_handling){
         if(isSome())
             return value;
-
-        foo();
-        value = std::move(def_value);
-        return value;
+        return std::move(none_handling());
     }
 
     template<typename S>

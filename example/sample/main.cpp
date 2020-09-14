@@ -37,14 +37,20 @@ int main(int argc, char *argv[])
                                     })
                                 );
 
-    // 551
-    qDebug()<<none_option.unwrap_def(551);
+    // 0
+    qDebug()<<none_option.unwrap_def(0);
 
     // 55
-    qDebug()<<i32_option.unwrap_or(0,[&](){qDebug()<<"SORRY, IT'S NONE OPTION"; });
+    qDebug()<<i32_option.unwrap_or(Q_NONE(int) impl ([&](){
+            qDebug()<<"SORRY, IT'S NONE OPTION";
+            return 0;
+    }));
 
-    // "SORRY, IT'S NONE OPTION"
-    qDebug()<<i32_option.unwrap_or(0,[&](){qDebug()<<"SORRY, IT'S NONE OPTION"; });
+    // 0 and print "SORRY, IT'S NONE OPTION"
+    qDebug()<<none_option.unwrap_or(Q_NONE(int) impl ([&](){
+            qDebug()<<"SORRY, IT'S NONE OPTION";
+            return 0;
+    }));
 
 
     // addr of QCoreApplication a
