@@ -1,6 +1,7 @@
 #ifndef QOPTION_H
 #define QOPTION_H
 #include <QString>
+#include <functional>
 
 ///\module Option:
 ///
@@ -46,13 +47,32 @@
     MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
 
     // 7. Get some value or throwing MyCustomException with an error message
-    MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");    */
+    MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+
+    // 8. Match result and handle it with custom handlers
+    MyClass * request = ...';
+    bool success = getObject().match(
+                Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
+                    return pack->export() && HandleResponse(pack);
+                }),
+
+                Q_NONE(bool) impl ([&]{
+                    request->setLineStatus(timeout);
+                    return false;
+                })
+            );
+
+
+*/
 
 ///\brief Container for necessarily error handling of returned results
 template <typename T>
 class QOption {
 public:
 #define NONE None()
+#define Q_SOME(R, T) std::function<R(T)>
+#define Q_NONE(R) std::function<R()>
+#define impl(code) (code)
 
     ///\brief Create QOption None value
     static QOption<T> None(){
@@ -68,7 +88,6 @@ public:
     static QOption<T> Some(T & val) {
         return QOption<T>(std::move(val));
     }
-
 
     bool operator==(const QOption<T> & o){
         return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
@@ -123,6 +142,15 @@ public:
         return value;
     }
 
+    template<typename S>
+    S match(Q_SOME(S, T) some_handling, Q_NONE(S) none_handling){
+        if(isSome())
+            return some_handling(value);
+        else
+            return none_handling();
+    }
+
+
     ///\brief Returns value if Some, or def_value if None
     const T & unwrap_def(T def_value) {
         if(isSome())
@@ -152,5 +180,6 @@ private:
     ///\brief Упакованное значение
     T value;
 };
+
 
 #endif // QOPTION_H
