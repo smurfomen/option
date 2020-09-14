@@ -99,23 +99,23 @@ public:
         return *this;
     }
 
-    ///\brief Returns true if None
+    ///\brief Returns true if statement is None
     bool isNone() const { return !available; }
 
-    ///\brief Returns true if Some
+    ///\brief Returns true if statement is Some
     bool isSome() const { return available; }
 
-    ///\brief Returns value if Some, or throws std::logic_error exception if None
+    ///\brief Returns value if statement is Some, or throws std::logic_error exception if statement is None
     const T & unwrap() {
         return unwrap<std::logic_error>();
     }
 
-    ///\brief Returns value if Some, or throws std::logic_error exception with text message if None
+    ///\brief Returns value if statement is Some, or throws std::logic_error exception with text message if statement is None
     const T & expect (const QString & text) {
         return expect<std::logic_error>(text);
     }
 
-    ///\brief Returns value if Some, or throws E type exception if None
+    ///\brief Returns value if statement is Some, or throws E type exception if statement is None
     template< typename E = std::logic_error>
     const T & unwrap() {
         if(isSome())
@@ -123,7 +123,7 @@ public:
         throw E("Option is None value");
     }
 
-    ///\brief Returns value if Some, or E type exception with text message if None
+    ///\brief Returns value if statement is Some, or E type exception with text message if statement is None
     template <typename E = std::logic_error>
     const T & expect (const QString & text) {
         if(isSome())
@@ -132,23 +132,31 @@ public:
     }
 
 
-    ///\brief Returns value if Some, or returns result of call none_handling if value is None
-    const T & unwrap_or(Q_NONE(T) none_handling){
+    ///\brief Returns value if Some, or returns result of call none_handler if statement is None
+    const T & unwrap_or(Q_NONE(T) none_handler){
         if(isSome())
             return value;
-        return std::move(none_handling());
+        return std::move(none_handler());
     }
 
+    ///\brief Call some_handler if statement is Some, or call none_handler if statement is None.
+    ///\arg     some_handler - std::functuion<S(T)> object - must be provide one T type arg and returns S type value
+    ///         none_handler - std::function<S()> object - must not provide args and returns S type value
+    ///
+    ///\details some_handler must be provide T type arg and returns S type value
+    ///         none_handler
+    ///
+    ///\warning be careful if use [&] in functors, scope of function objects not save after exit from lifearea of creation scope
     template<typename S>
-    S match(Q_SOME(S, T) some_handling, Q_NONE(S) none_handling){
+    S match(Q_SOME(S, T) some_handler, Q_NONE(S) none_handler){
         if(isSome())
-            return some_handling(value);
+            return some_handler(value);
         else
-            return none_handling();
+            return none_handler();
     }
 
 
-    ///\brief Returns value if Some, or def_value if None
+    ///\brief Returns value if statement is Some, or def_value if statement is None
     const T & unwrap_def(T def_value) {
         if(isSome())
             return value;
