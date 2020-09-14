@@ -1,68 +1,92 @@
+/*
+ MIT License
+
+ Copyright (c) 2020 Agadzhanov Vladimir
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+                                                                                 */
+
 #ifndef QOPTION_H
 #define QOPTION_H
 #include <QString>
 #include <functional>
 
-///\module Option:
-///
-///\details Creation:
-/// Bad way:
-///\code
-/* MyClass * getMyClass() {
-     if(expression)
-        return new MyClass(args..);
-     else
-        return nullptr;
-   }                                                     */
-/// Good way for example:
-/// \code
-/* Option<MyClass*> getMyClass() {
-     if(expression)
-        return Option<MyClass*>::Some(new MyClass(args..));
-     else
-        return Option<MyClass*>::NONE;
-   }                                                   */
-///
-///
-/// QOption error handling use-cases:
-///\code
-/*  // 1. Check before use
-    auto o_mc = getMyClass();
-    if(o_mc.isSome())
-        o_mc.unwrap()->myClassFoo(args..);
+/*! \module Option:
+    \details Creation:
+     Bad way:
+         \code{.cpp}
+         MyClass * getMyClass() {
+            if(expression)
+                return new MyClass(args..);
+            else
+                return nullptr;
+         }
+        \endcode
 
-    // 2. Get a value or throwing std::logic_error type exception
-    MyClass * mc = getMyClass().unwrap();
+    Good way for example:
+        \code{.cpp}
+        Option<MyClass*> getMyClass() {
+          if(expression)
+             return Option<MyClass*>::Some(new MyClass(args..));
+          else
+             return Option<MyClass*>::NONE;
+        }
+        \endcode
 
-    // 3. Get a value or throwing MyCustomException
-    MyClass * mc = getMyClass().unwrap<MyCustomException>();
+    QOption error handling use-cases:
+        \code{.cpp}
+        // 1. Check before use
+        auto o_mc = getMyClass();
+        if(o_mc.isSome())
+            o_mc.unwrap()->myClassFoo(args..);
 
-    // 4. Get some value or default value if QOption is not Some
-    QString connection = createConnectionString(params).unwrap_def("something connection string");
+        // 2. Get a value or throwing std::logic_error type exception
+        MyClass * mc = getMyClass().unwrap();
 
-    // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
-    QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
+        // 3. Get a value or throwing MyCustomException
+        MyClass * mc = getMyClass().unwrap<MyCustomException>();
 
-    // 6. Get some value or throwing std::logic_error type exception with an error message
-    MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+        // 4. Get some value or default value if QOption is not Some
+        QString connection = createConnectionString(params).unwrap_def("something connection string");
 
-    // 7. Get some value or throwing MyCustomException with an error message
-    MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+        // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
+        QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
 
-    // 8. Match result and handle it with custom handlers
-    MyClass * request = ...';
-    bool success = getObject().match(
-                Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
-                    return pack->export() && HandleResponse(pack);
-                }),
+        // 6. Get some value or throwing std::logic_error type exception with an error message
+        MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
 
-                Q_NONE(bool) impl ([&]{
-                    request->setLineStatus(timeout);
-                    return false;
-                })
-            );
+        // 7. Get some value or throwing MyCustomException with an error message
+        MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
 
+        // 8. Match result and handle it with custom handlers
+        MyClass * request = ...';
+        bool success = getObject().match(
+                    Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
+                        return pack->export() && HandleResponse(pack);
+                    }),
 
+                    Q_NONE(bool) impl ([&]{
+                        request->setLineStatus(timeout);
+                        return false;
+                    })
+                );
+        \endcode
 */
 
 ///\brief Container for necessarily error handling of returned results
@@ -79,12 +103,12 @@ public:
         return QOption<T>();
     }
 
-    ///\brief Create QOption Some value use copy val into QOption value
+    ///\brief Create QOption Some statement using copy val into QOption value
     static QOption<T> Some(const T & val) {
         return QOption<T>(val);
     }
 
-    ///\brief Create QOption Some value use copy val into QOption value
+    ///\brief Create QOption Some statement using move val into QOption value
     static QOption<T> Some(T & val) {
         return QOption<T>(std::move(val));
     }
