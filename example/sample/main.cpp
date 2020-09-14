@@ -17,10 +17,10 @@ int main(int argc, char *argv[])
     qDebug()<<tmr.restart();
     auto first = QOption<std::vector<long>>::Some(std::move(v));
 
-    // after moving first statement will be None
+    // after copy or moving first statement will be None
     auto second = std::move(first);
     // first.unwrap() - throws exception
-    qDebug()<<tmr.elapsed(); // check move
+    qDebug()<<tmr.elapsed();
 
 
     auto none_option = QOption<int>::NONE;

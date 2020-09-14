@@ -87,8 +87,6 @@
             );
 */
 
-#include <QVector>
-#include <QDebug>
 ///\brief Container for necessarily error handling of returned results
 template <typename T>
 class QOption {
@@ -104,8 +102,19 @@ public:
         o.available = false;
     }
 
+    QOption(QOption<value_type> & o) noexcept
+        : available(o.available), value(o.value)
+    {
+        o.available = false;
+    }
+
     QOption() noexcept
         : available(false)
+    {
+
+    }
+
+    QOption(const T & t) : available(true), value(t)
     {
 
     }
@@ -120,9 +129,14 @@ public:
         return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
     }
 
+    QOption<value_type> & operator=(const QOption<value_type> & o){
+        value = o.value;
+        available = o.available;
+        o.available = false;
+        return *this;
+    }
 
     QOption<value_type> & operator=(QOption<value_type> && o){
-        qDebug()<<"&&";
         value = std::move(o.value);
         available = o.available;
         o.available = false;
@@ -135,6 +149,11 @@ public:
     }
 
     ///\brief Create QOption Some value use copy val into QOption value
+    static QOption<T> Some(const T & val) {
+        return QOption<T>(val);
+    }
+
+    ///\brief Create QOption Some value use move val into QOption value
     static QOption<T> Some(T && val) {
         return QOption<T>(std::move(val));
     }
@@ -201,7 +220,7 @@ public:
     }
 
     ///\brief Returns value if statement is Some, or def_value if statement is None
-    value_type unwrap_def(value_type && def_value) {
+    value_type unwrap_def(value_type def_value) {
         if(isNone())
             value = std::move(def_value);
 
