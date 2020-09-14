@@ -1,92 +1,68 @@
-/*
- MIT License
-
- Copyright (c) 2020 Agadzhanov Vladimir
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in all
- copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- SOFTWARE.
-                                                                                 */
-
 #ifndef QOPTION_H
 #define QOPTION_H
 #include <QString>
 #include <functional>
 
-/*! \module Option:
-    \details Creation:
-     Bad way:
-         \code{.cpp}
-         MyClass * getMyClass() {
-            if(expression)
-                return new MyClass(args..);
-            else
-                return nullptr;
-         }
-        \endcode
+///\module Option:
+///
+///\details Creation:
+/// Bad way:
+///\code
+/* MyClass * getMyClass() {
+     if(expression)
+        return new MyClass(args..);
+     else
+        return nullptr;
+   }                                                     */
+/// Good way for example:
+/// \code
+/* Option<MyClass*> getMyClass() {
+     if(expression)
+        return Option<MyClass*>::Some(new MyClass(args..));
+     else
+        return Option<MyClass*>::NONE;
+   }                                                   */
+///
+///
+/// QOption error handling use-cases:
+///\code
+/*  // 1. Check before use
+    auto o_mc = getMyClass();
+    if(o_mc.isSome())
+        o_mc.unwrap()->myClassFoo(args..);
 
-    Good way for example:
-        \code{.cpp}
-        Option<MyClass*> getMyClass() {
-          if(expression)
-             return Option<MyClass*>::Some(new MyClass(args..));
-          else
-             return Option<MyClass*>::NONE;
-        }
-        \endcode
+    // 2. Get a value or throwing std::logic_error type exception
+    MyClass * mc = getMyClass().unwrap();
 
-    QOption error handling use-cases:
-        \code{.cpp}
-        // 1. Check before use
-        auto o_mc = getMyClass();
-        if(o_mc.isSome())
-            o_mc.unwrap()->myClassFoo(args..);
+    // 3. Get a value or throwing MyCustomException
+    MyClass * mc = getMyClass().unwrap<MyCustomException>();
 
-        // 2. Get a value or throwing std::logic_error type exception
-        MyClass * mc = getMyClass().unwrap();
+    // 4. Get some value or default value if QOption is not Some
+    QString connection = createConnectionString(params).unwrap_def("something connection string");
 
-        // 3. Get a value or throwing MyCustomException
-        MyClass * mc = getMyClass().unwrap<MyCustomException>();
+    // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
+    QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
 
-        // 4. Get some value or default value if QOption is not Some
-        QString connection = createConnectionString(params).unwrap_def("something connection string");
+    // 6. Get some value or throwing std::logic_error type exception with an error message
+    MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
 
-        // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
-        QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
+    // 7. Get some value or throwing MyCustomException with an error message
+    MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
 
-        // 6. Get some value or throwing std::logic_error type exception with an error message
-        MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+    // 8. Match result and handle it with custom handlers
+    MyClass * request = ...';
+    bool success = getObject().match(
+                Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
+                    return pack->export() && HandleResponse(pack);
+                }),
 
-        // 7. Get some value or throwing MyCustomException with an error message
-        MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+                Q_NONE(bool) impl ([&]{
+                    request->setLineStatus(timeout);
+                    return false;
+                })
+            );
 
-        // 8. Match result and handle it with custom handlers
-        MyClass * request = ...';
-        bool success = getObject().match(
-                    Q_SOME(bool, MyClass *) impl ([&](MyClass * pack){
-                        return pack->export() && HandleResponse(pack);
-                    }),
 
-                    Q_NONE(bool) impl ([&]{
-                        request->setLineStatus(timeout);
-                        return false;
-                    })
-                );
-        \endcode
 */
 
 ///\brief Container for necessarily error handling of returned results
@@ -94,30 +70,29 @@ template <typename T>
 class QOption {
 public:
 #define NONE None()
-#define Q_SOME(R, T) std::function<R(T)>
-#define Q_NONE(R) std::function<R()>
-#define impl(code) (code)
+
+    using value_type = T;
 
     ///\brief Create QOption None value
     static QOption<T> None(){
         return QOption<T>();
     }
 
-    ///\brief Create QOption Some statement using copy val into QOption value
+    ///\brief Create QOption Some value use copy val into QOption value
     static QOption<T> Some(const T & val) {
         return QOption<T>(val);
     }
 
-    ///\brief Create QOption Some statement using move val into QOption value
+    ///\brief Create QOption Some value use copy val into QOption value
     static QOption<T> Some(T & val) {
         return QOption<T>(std::move(val));
     }
 
-    bool operator==(const QOption<T> & o){
+    bool operator==(const QOption<value_type> & o){
         return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
     }
 
-    QOption<T> & operator=(QOption<T> & o){
+    QOption<value_type> & operator=(QOption<value_type> & o){
         available = o.available;
         value = std::move(o.value);
         return *this;
@@ -130,18 +105,18 @@ public:
     bool isSome() const { return available; }
 
     ///\brief Returns value if statement is Some, or throws std::logic_error exception if statement is None
-    const T & unwrap() {
+    const value_type & unwrap() {
         return unwrap<std::logic_error>();
     }
 
     ///\brief Returns value if statement is Some, or throws std::logic_error exception with text message if statement is None
-    const T & expect (const QString & text) {
+    const value_type & expect (const QString & text) {
         return expect<std::logic_error>(text);
     }
 
     ///\brief Returns value if statement is Some, or throws E type exception if statement is None
     template< typename E = std::logic_error>
-    const T & unwrap() {
+    const value_type & unwrap() {
         if(isSome())
             return value;
         throw E("Option is None value");
@@ -149,7 +124,7 @@ public:
 
     ///\brief Returns value if statement is Some, or E type exception with text message if statement is None
     template <typename E = std::logic_error>
-    const T & expect (const QString & text) {
+    const value_type & expect (const QString & text) {
         if(isSome())
             return value;
         throw E(text.toStdString().c_str());
@@ -157,22 +132,20 @@ public:
 
 
     ///\brief Returns value if Some, or returns result of call none_handler if statement is None
-    const T & unwrap_or(Q_NONE(T) none_handler){
+    ///\arg     none_handler - std::function<value_type()> object - must not provide args and returns \e value_type value
+    const value_type & unwrap_or(std::function<value_type()> none_handler){
         if(isSome())
             return value;
         return std::move(none_handler());
     }
 
     ///\brief Call some_handler if statement is Some, or call none_handler if statement is None.
-    ///\arg     some_handler - std::functuion<S(T)> object - must be provide one T type arg and returns S type value
-    ///         none_handler - std::function<S()> object - must not provide args and returns S type value
+    ///\arg     some_handler - std::functuion<Res(value_type)> object - must be provide one \e value_type type arg and returns \e Res type value
+    ///         none_handler - std::function<Res()> object - must not provide args and returns \e Res type value
     ///
-    ///\details some_handler must be provide T type arg and returns S type value
-    ///         none_handler
-    ///
-    ///\warning be careful if use [&] in functors, scope of function objects not save after exit from lifearea of creation scope
-    template<typename S>
-    S match(Q_SOME(S, T) some_handler, Q_NONE(S) none_handler){
+    ///\warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
+    template<typename Res>
+    Res match(std::function<Res(value_type)> some_handler, std::function<Res()>  none_handler){
         if(isSome())
             return some_handler(value);
         else
@@ -181,7 +154,7 @@ public:
 
 
     ///\brief Returns value if statement is Some, or def_value if statement is None
-    const T & unwrap_def(T def_value) {
+    const value_type & unwrap_def(value_type def_value) {
         if(isSome())
             return value;
         value = std::move(def_value);
@@ -193,12 +166,12 @@ private:
         available = false;
     }
 
-    QOption(const T & t){
+    QOption(const value_type & t){
         value = t;
         available = true;
     }
 
-    QOption(T && t) {
+    QOption(value_type && t) {
         value = std::move(t);
         available = true;
     }
@@ -207,7 +180,7 @@ private:
     bool available {false};
 
     ///\brief Упакованное значение
-    T value;
+    value_type value;
 };
 
 
