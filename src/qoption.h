@@ -27,67 +27,72 @@
 #include <QString>
 #include <functional>
 
-///\module Option:
-///
-///\details Creation:
-/// Bad way:
-///\code
-/* MyClass * getMyClass() {
-     if(expression)
-        return new MyClass(args..);
-     else
-        return nullptr;
-   }                                                     */
-/// Good way for example:
-/// \code
-/* Option<MyClass*> getMyClass() {
-     if(expression)
-        return Option<MyClass*>::Some(new MyClass(args..));
-     else
-        return Option<MyClass*>::NONE;
-   }                                                   */
-///
-///
-/// QOption error handling use-cases:
-///\code
-/*  // 1. Check before use
-    auto o_mc = getMyClass();
-    if(o_mc.isSome())
-        o_mc.unwrap()->myClassFoo(args..);
+/*! \module Option:
+    \brief Container for necessarily error handling of returned results
+     Bad way:
+    \code{.cpp}
+        ...
+        MyClass * getMyClass() {
+          if(expression)
+             return new MyClass(args..);
+          else
+             return nullptr;
+        }
+        ...
+    \endcode
 
-    // 2. Get a value or throwing std::logic_error type exception
-    MyClass * mc = getMyClass().unwrap();
+     Good way for example:
+     \code{.cpp}
+        ...
+        Option<MyClass*> getMyClass() {
+          if(expression)
+             return Option<MyClass*>::Some(new MyClass(args..));
+          else
+             return Option<MyClass*>::NONE;
+        }
+        ...
+    \endcode
 
-    // 3. Get a value or throwing MyCustomException
-    MyClass * mc = getMyClass().unwrap<MyCustomException>();
 
-    // 4. Get some value or default value if QOption is not Some
-    QString connection = createConnectionString(params).unwrap_def("something connection string");
+     QOption error handling use-cases:
+    \code{.cpp}
+        // 1. Check before use
+        auto o_mc = getMyClass();
+        if(o_mc.isSome())
+            o_mc.unwrap()->myClassFoo(args..);
 
-    // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
-    QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
+        // 2. Get a value or throwing std::logic_error type exception
+        MyClass * mc = getMyClass().unwrap();
 
-    // 6. Get some value or throwing std::logic_error type exception with an error message
-    MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+        // 3. Get a value or throwing MyCustomException
+        MyClass * mc = getMyClass().unwrap<MyCustomException>();
 
-    // 7. Get some value or throwing MyCustomException with an error message
-    MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+        // 4. Get some value or default value if QOption is not Some
+        QString connection = createConnectionString(params).unwrap_def("something connection string");
 
-    // 8. Match result and handle it with custom handlers
-    MyClass * request = ...';
-    bool success = getObject().match<bool>(
-                [&](MyClass * pack) -> bool{
-                    return pack->export() && HandleResponse(pack);
-                },
+        // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
+        QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
 
-                [&]() -> bool {
-                    request->setLineStatus(timeout);
-                    return false;
-                }
-            );
-*/
+        // 6. Get some value or throwing std::logic_error type exception with an error message
+        MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
 
-///\brief Container for necessarily error handling of returned results
+        // 7. Get some value or throwing MyCustomException with an error message
+        MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+
+        // 8. Match result and handle it with custom handlers
+        MyClass * request = ...';
+        bool success = getObject().match<bool>(
+                    [&](MyClass * pack) -> bool{
+                        return pack->export() && HandleResponse(pack);
+                    },
+
+                    [&]() -> bool {
+                        request->setLineStatus(timeout);
+                        return false;
+                    }
+                );
+    \endcode
+                                                                                                                                            */
 template <typename T>
 class QOption {
 public:
@@ -114,7 +119,8 @@ public:
 
     }
 
-    QOption(const T & t) : available(true), value(t)
+    QOption(const T & t) noexcept
+        : available(true), value(t)
     {
 
     }
