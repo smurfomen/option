@@ -11,15 +11,16 @@ int main(int argc, char *argv[])
     QElapsedTimer tmr;
     tmr.start();
     std::vector<long> v;
-    for(int i = 0; i < 10000000; i++)
+    for(int i = 0; i < 1000000; i++)
         v.push_back(i);
 
     qDebug()<<tmr.restart();
     auto first = QOption<std::vector<long>>::Some(std::move(v));
 
-    // after copy or moving first statement will be None
+     // after copy or moving first statement will be None
     auto second = std::move(first);
 
+    qDebug()<<second.unwrap().size();
     // first.unwrap() - throws exception
     qDebug()<<tmr.elapsed();
 
@@ -73,6 +74,16 @@ int main(int argc, char *argv[])
 
     // programm exec file path
     qDebug()<<appptr_opt.unwrap()->arguments();
+
+
+    appptr_opt.if_none([]{
+        qDebug()<< "wrong";
+    }).if_some([](QCoreApplication * app) {
+        qDebug()<<app->arguments();
+    })
+    .compose();
+
+
 
     return a.exec();
 }

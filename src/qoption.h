@@ -26,11 +26,13 @@
 #define QOPTION_H
 #include <QString>
 #include <functional>
+#include <type_traits>
+#include <queue>
 
-/*! \module Option:
-    \brief Container for necessarily error handling of returned results
+/*! @module Option:
+    @brief Container for necessarily error handling of returned results
      Bad way:
-    \code{.cpp}
+    @code{.cpp}
         ...
         MyClass * getMyClass() {
           if(expression)
@@ -39,10 +41,10 @@
              return nullptr;
         }
         ...
-    \endcode
+    @endcode
 
      Good way for example:
-     \code{.cpp}
+     @code{.cpp}
         ...
         Option<MyClass*> getMyClass() {
           if(expression)
@@ -51,11 +53,11 @@
              return Option<MyClass*>::NONE;
         }
         ...
-    \endcode
+    @endcode
 
 
      QOption error handling use-cases:
-    \code{.cpp}
+    @code{.cpp}
         // 1. Check before use
         auto o_mc = getMyClass();
         if(o_mc.isSome())
@@ -91,25 +93,39 @@
                         return false;
                     }
                 );
-    \endcode
+    @endcode
+
+    @code {.cpp}
+        // composing
+        option.if_some([&, digit](MyClass & obj){
+            foo(obj, digit);
+            qDebug()<<"handle" << obj.Name();
+        }).if_none([]() {
+            qDebug()<<"Error handle";
+        }).compose();
+    @endcode
                                                                                                                                             */
-template <typename T>
+
+template <typename Type>
 class QOption {
 public:
-
 #define NONE None()
+    typedef typename std::aligned_storage<sizeof (Type),  alignof(Type)> value_storage;
+    QOption(const QOption & o) = delete;
+    QOption & operator=(const QOption & o) = delete;
 
-    using value_type = T;
-
-    QOption(QOption<value_type> && o) noexcept
-        : available(o.available), value(std::move(o.value))
-    {
-        o.available = false;
+    QOption(QOption && o) noexcept {
+        if(o.isSome()) {
+            *__ptr_v() = o.unwrap();
+            available = true;
+        }
+        else
+            available = false;
     }
 
-    QOption(QOption<value_type> & o) noexcept
-        : available(o.available), value(o.value)
-    {
+    QOption(QOption & o) noexcept {
+        value = o.value;
+        available = o.available;
         o.available = false;
     }
 
@@ -119,129 +135,222 @@ public:
 
     }
 
-    QOption(const T & t) noexcept
-        : available(true), value(t)
-    {
-
+    QOption(const Type & t) noexcept {
+        *__ptr_v() = t;
+        available = true;
     }
 
-    QOption(T && t) noexcept
-        : available(true), value(std::move(t))
-    {
-
+    QOption(Type && t) noexcept {
+        std::swap(*__ptr_v(), t);
+        available = true;
     }
 
-    bool operator==(const QOption<value_type> & o){
-        return isSome() == o.isSome() && ((isSome() && value == o.value) || isNone());
+    bool operator==(const QOption & o) {
+        return isSome() == o.isSome() && ((isSome() && *__ptr_v() == *o.__ptr_v()) || isNone());
     }
 
-    QOption<value_type> & operator=(QOption<value_type> && o){
-        value = std::move(o.value);
-        available = o.available;
-        o.available = false;
+    QOption & operator=(QOption && o) noexcept {
+        if(o.isSome()) {
+            *__ptr_v() = o.unwrap();
+            available = true;
+        }
+        else
+            available = false;
+
         return *this;
     }
 
-    ///\brief Create QOption None value
-    static QOption<T> None(){
-        return QOption<T>();
+    QOption & operator=(QOption & o) noexcept {
+        if(o.isSome()) {
+            o.available = false;
+            value = o.value;
+            available = true;
+        }
+        else
+            available = false;
+
+        return *this;
     }
 
-    ///\brief Create QOption Some value use copy val into QOption value
-    static QOption<T> Some(const T & val) {
-        return QOption<T>(val);
+    ///@brief Create QOption None value
+    static QOption None() {
+        return QOption();
     }
 
-    ///\brief Create QOption Some value use forwarding val into QOption value
-    static QOption<T> Some(T && val) {
-        return QOption<T>(std::forward<T>(val));
+    ///@brief Create QOption Some value use copy val into QOption value
+    static QOption Some(const Type & val) {
+        return QOption(val);
     }
 
-    ///\brief Returns true if statement is None
+    ///@brief Create QOption Some value use forwarding val into QOption value
+    static QOption Some(Type && val) {
+        return QOption(std::forward<Type>(val));
+    }
+
+    ///@brief Returns true if statement is None
     bool isNone() const { return !available; }
 
-    ///\brief Returns true if statement is Some
+    ///@brief Returns true if statement is Some
     bool isSome() const { return available; }
 
-    ///\brief Returns value if statement is Some, or throws std::logic_error exception if statement is None
-    value_type unwrap() throw (std::logic_error) {
-        return unwrap<std::logic_error>();
+    ///@brief inner class for compose lambda expressions for handling option value
+    class composer {
+    public:
+        typedef typename std::function<void()> _callable_none;
+        typedef typename std::function<void(Type&)> _callable_some;
+
+        composer(QOption & o) {
+            if(o.isSome()) {
+                *__ptr_v() = o.unwrap();
+                available = true;
+            }
+            else
+                available = false;
+        }
+
+        composer() {
+            available = false;
+        }
+
+        composer(composer && c) noexcept
+            : value(std::move(c.value)),
+              available(c.available),
+              none_invokes(c.none_invokes),
+              some_invokes(c.some_invokes)
+        {
+            c.available = false;
+        }
+
+        composer & if_some(_callable_some && fn) {
+            some_invokes.push_back(fn);
+            return *this;
+        }
+
+        composer & if_none(_callable_none && fn) {
+            none_invokes.push_back(fn);
+            return *this;
+        }
+
+        void compose() {
+            if(available) {
+                for(auto & fn : some_invokes)
+                    fn(*__ptr_v());
+            }
+
+            else {
+                for(auto & fn : none_invokes)
+                    fn();
+            }
+        }
+
+    private:
+        Type * __ptr_v() {
+            return reinterpret_cast<Type*>(&value);
+        }
+
+        value_storage value;
+        bool available {false};
+        std::vector<_callable_none> none_invokes;
+        std::vector<_callable_some> some_invokes;
+    };
+
+    ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for some case
+    template<typename _Callable_some = typename composer::_callable_some>
+    composer if_some(_Callable_some && fn) {
+        return std::move(composer(*this).if_some(fn));
     }
 
-    ///\brief Returns value if statement is Some, or throws std::logic_error exception with text message if statement is None
-    value_type expect (const QString & text) throw (std::logic_error) {
-        return expect<std::logic_error>(text);
+    ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for none case
+    template <typename _Callable_none>
+    composer if_none(_Callable_none && fn) {
+        return std::move(composer(*this).if_none(fn));
     }
 
-    ///\brief Returns value if statement is Some, or throws E type exception if statement is None
+    ///@brief Returns value if statement is Some, or throws E type exception if statement is None
     template< typename E = std::logic_error>
-    value_type unwrap()throw (E) {
+    Type unwrap() {
         if(isNone())
             throw E("Option is None value");
 
         available = false;
-        return std::move(value);
+        return std::move(*__ptr_v());
     }
 
-    ///\brief Returns value if statement is Some, or E type exception with text message if statement is None
+
+    ///@brief Returns value if statement is Some, or E type exception with text message if statement is None
     template <typename E = std::logic_error>
-    value_type expect (const QString & text) throw (E) {
+    Type expect (const char * text) {
         if(isNone())
-            throw E(text.toStdString().c_str());
+            throw E(text);
 
         available = false;
-        return std::move(value);
+        return std::move(*__ptr_v());
     }
 
+    ///@brief Returns value if statement is Some, or E type exception with text message if statement is None
+    template <typename E = std::logic_error>
+    Type expect (const QString & text) {
+        return expect<E>(text.toStdString().c_str());
+    }
 
-    ///\brief Returns value if Some, or returns result of call none_handler if statement is None
-    ///\arg     none_handler - std::function<value_type()> object - must not provide args and returns \e value_type value
-    value_type unwrap_or(const std::function<value_type()> & none_handler) {
+    ///@brief Returns value if Some, or returns result of call none_invoke if statement is None
+    ///@arg     none_invoke - std::function<value_type()> object - must not provide args and returns @e value_type value
+    template<typename _Callable_none>
+    Type unwrap_or(_Callable_none && none_invoke) {
         if(isNone())
-            value = none_handler();
+            *__ptr_v() = none_invoke();
 
         available = false;
-        return std::move(value);
+        return std::move(*__ptr_v());
     }
 
-    ///\brief Call some_handler if statement is Some, or call none_handler if statement is None.
-    ///\arg     some_handler - std::functuion<Res(value_type)> object - must be provide one \e value_type type arg and returns \e Res type value
-    ///         none_handler - std::function<Res()> object - must not provide args and returns \e Res type value
+    ///@brief Call some_handler if statement is Some, or call none_invoke if statement is None.
+    ///@arg     some_invoke - std::functuion<Res(value_type)> object - must be provide one @e value_type type arg and returns @e Res type value
+    ///         none_invoke - std::function<Res()> object - must not provide args and returns @e Res type value
     ///
-    ///\warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
-    template<typename Res>
-    Res match(const std::function<Res(value_type)> & some_handler, const std::function<Res()> & none_handler) {
+    ///@warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
+    template<typename Res, typename _Callable_some, typename _Callable_none>
+    Res match(_Callable_some && some_invoke, _Callable_none && none_invoke) {
         if(isNone())
-            return none_handler();
+            return none_invoke();
 
         available = false;
-        return some_handler(std::move(value));
+        return some_invoke(std::move(*__ptr_v()));
     }
 
-    ///\brief Returns value if statement is Some, or def_value if statement is None
-    value_type unwrap_def(value_type def_value) {
+    ///@brief Returns value if statement is Some, or def_value if statement is None
+    Type unwrap_def(const Type & def_value) {
         if(isNone())
-            value = std::move(def_value);
+            // copy
+            *__ptr_v() = def_value;
 
         available = false;
-        return std::move(value);
+        return std::move(*__ptr_v());
+    }
+
+
+    ///@brief Returns value if statement is Some, or def_value if statement is None
+    Type unwrap_def(Type && def_value) {
+        if(isNone())
+            // move
+            *__ptr_v() = std::forward<Type>(def_value);
+
+        available = false;
+        return std::move(*__ptr_v());
     }
 
 private:
-
-    QOption<value_type> & operator=(const QOption<value_type> & o){
-        value = o.value;
-        available = o.available;
-        return *this;
+    Type * __ptr_v() {
+        return reinterpret_cast<Type*>(&value);
     }
 
-    ///\brief Статус валидности
+    ///@brief validation statement
     bool available {false};
 
-    ///\brief Упакованное значение
-    value_type value;
+    ///@brief aligned storage with @e keeping data of value
+    value_storage value;
 };
 
-
-
 #endif // QOPTION_H
+
+
