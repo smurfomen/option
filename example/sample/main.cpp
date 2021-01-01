@@ -80,8 +80,7 @@ int main(int argc, char *argv[])
         qDebug()<< "wrong";
     }).if_some([](QCoreApplication * app) {
         qDebug()<<app->arguments();
-    })
-    .compose();
+    });
 
 
 

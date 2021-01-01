@@ -105,7 +105,6 @@
         }).compose();
     @endcode
                                                                                                                                             */
-
 template <typename Type>
 class QOption {
 public:
@@ -124,9 +123,12 @@ public:
     }
 
     QOption(QOption & o) noexcept {
-        value = o.value;
-        available = o.available;
-        o.available = false;
+        if(o.isSome()) {
+            *__ptr_v() = o.unwrap();
+            available = true;
+        }
+        else
+            available = false;
     }
 
     QOption() noexcept
@@ -193,77 +195,20 @@ public:
     ///@brief Returns true if statement is Some
     bool isSome() const { return available; }
 
-    ///@brief inner class for compose lambda expressions for handling option value
-    class composer {
-    public:
-        typedef typename std::function<void()> _callable_none;
-        typedef typename std::function<void(Type&)> _callable_some;
-
-        composer(QOption & o) {
-            if(o.isSome()) {
-                *__ptr_v() = o.unwrap();
-                available = true;
-            }
-            else
-                available = false;
-        }
-
-        composer() {
-            available = false;
-        }
-
-        composer(composer && c) noexcept
-            : value(std::move(c.value)),
-              available(c.available),
-              none_invokes(c.none_invokes),
-              some_invokes(c.some_invokes)
-        {
-            c.available = false;
-        }
-
-        composer & if_some(_callable_some && fn) {
-            some_invokes.push_back(fn);
-            return *this;
-        }
-
-        composer & if_none(_callable_none && fn) {
-            none_invokes.push_back(fn);
-            return *this;
-        }
-
-        void compose() {
-            if(available) {
-                for(auto & fn : some_invokes)
-                    fn(*__ptr_v());
-            }
-
-            else {
-                for(auto & fn : none_invokes)
-                    fn();
-            }
-        }
-
-    private:
-        Type * __ptr_v() {
-            return reinterpret_cast<Type*>(&value);
-        }
-
-        value_storage value;
-        bool available {false};
-        std::vector<_callable_none> none_invokes;
-        std::vector<_callable_some> some_invokes;
-    };
-
     ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for some case
-    template<typename _Callable_some = typename composer::_callable_some>
-    composer if_some(_Callable_some && fn) {
-        return std::move(composer(*this).if_some(fn));
+    template<typename some_callable>
+    QOption & if_some(some_callable && fn) {
+        if(isSome())
+            fn(*__ptr_v());
+        return *this;
     }
 
     ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for none case
-    template <typename _Callable_none>
-    composer if_none(_Callable_none && fn) {
-        return std::move(composer(*this).if_none(fn));
+    template <typename none_callable>
+    QOption & if_none(none_callable && fn) {
+        if(isNone())
+            fn();
+        return *this;
     }
 
     ///@brief Returns value if statement is Some, or throws E type exception if statement is None
@@ -295,8 +240,8 @@ public:
 
     ///@brief Returns value if Some, or returns result of call none_invoke if statement is None
     ///@arg     none_invoke - std::function<value_type()> object - must not provide args and returns @e value_type value
-    template<typename _Callable_none>
-    Type unwrap_or(_Callable_none && none_invoke) {
+    template<typename none_callable>
+    Type unwrap_or(none_callable && none_invoke) {
         if(isNone())
             *__ptr_v() = none_invoke();
 
@@ -309,13 +254,13 @@ public:
     ///         none_invoke - std::function<Res()> object - must not provide args and returns @e Res type value
     ///
     ///@warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
-    template<typename Res, typename _Callable_some, typename _Callable_none>
-    Res match(_Callable_some && some_invoke, _Callable_none && none_invoke) {
+    template<typename Res, typename some_callable, typename none_callable>
+    Res match(some_callable && some_fn, none_callable && none_fn) {
         if(isNone())
-            return none_invoke();
+            return none_fn();
 
         available = false;
-        return some_invoke(std::move(*__ptr_v()));
+        return some_fn(std::move(*__ptr_v()));
     }
 
     ///@brief Returns value if statement is Some, or def_value if statement is None
