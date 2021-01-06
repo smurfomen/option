@@ -24,12 +24,11 @@
 
 #ifndef QOPTION_H
 #define QOPTION_H
-#include <QString>
 #include <functional>
 #include <type_traits>
 #include <queue>
 
-/*! @module Option:
+/*! @module QOption:
     @brief Container for necessarily error handling of returned results
      Bad way:
     @code{.cpp}
@@ -46,40 +45,58 @@
      Good way for example:
      @code{.cpp}
         ...
-        Option<MyClass*> getMyClass() {
+        QOption<MyClass*> getMyClass() {
           if(expression)
-             return Option<MyClass*>::Some(new MyClass(args..));
+             return QOption<MyClass*>::Some(new MyClass(args..));
           else
-             return Option<MyClass*>::NONE;
+             return QOption<MyClass*>::NONE;
         }
         ...
     @endcode
 
 
-     QOption error handling use-cases:
+    QOption error handling use-cases:
     @code{.cpp}
         // 1. Check before use
         auto o_mc = getMyClass();
         if(o_mc.isSome())
-            o_mc.unwrap()->myClassFoo(args..);
+            o_mc.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
 
         // 2. Get a value or throwing std::logic_error type exception
-        MyClass * mc = getMyClass().unwrap();
+        try {
+            MyClass * mc = getMyClass().unwrap();
+        } catch (std::logic_error & le) {
+            // Option is None value
+        }
 
         // 3. Get a value or throwing MyCustomException
-        MyClass * mc = getMyClass().unwrap<MyCustomException>();
+        try {
+            MyClass * mc = getMyClass().unwrap<MyCustomException>();
+        } catch (MyCustomException & mce) {
+            // Option is None value
+        }
 
         // 4. Get some value or default value if QOption is not Some
-        QString connection = createConnectionString(params).unwrap_def("something connection string");
+        const char * connection = createConnectionString(params).unwrap_def("something default connection string");
 
         // 5. Get some value or executing a nested lambda function and get the default value if QOption is not Some
-        QString connection = createConnectionString(params).unwrap_or("oops!", [=]{ qDebug()<<"Error Handling Params:" << params; });
+        // this way do not overhead when some case and none default object will not be created
+        const char * connection = createConnectionString(params).unwrap_or([]{ return "something default connection string"; });
 
         // 6. Get some value or throwing std::logic_error type exception with an error message
-        MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+        try {
+             MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error is throwed.");
+        } catch (std::logic_error & le) {
+            // Option is None value
+        }
 
         // 7. Get some value or throwing MyCustomException with an error message
-        MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+        // 3. Get a value or throwing MyCustomException
+        try {
+            MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException is throwed");
+        } catch (MyCustomException & mce) {
+            // Option is None value
+        }
 
         // 8. Match result and handle it with custom handlers
         MyClass * request = ...';
@@ -97,12 +114,11 @@
 
     @code {.cpp}
         // composing
-        option.if_some([&, digit](MyClass & obj){
+        option.if_some([&](MyClass & obj){
             foo(obj, digit);
-            qDebug()<<"handle" << obj.Name();
         }).if_none([]() {
-            qDebug()<<"Error handle";
-        }).compose();
+            log("Error handle");
+        });
     @endcode
                                                                                                                                             */
 template <typename Type>
@@ -232,26 +248,20 @@ public:
         return std::move(*__ptr_v());
     }
 
-    ///@brief Returns value if statement is Some, or E type exception with text message if statement is None
-    template <typename E = std::logic_error>
-    Type expect (const QString & text) {
-        return expect<E>(text.toStdString().c_str());
-    }
-
     ///@brief Returns value if Some, or returns result of call none_invoke if statement is None
-    ///@arg     none_invoke - std::function<value_type()> object - must not provide args and returns @e value_type value
+    ///@arg     none_ifn - std::function<value_type()> object - must not provide args and returns @e value_type value
     template<typename none_callable>
-    Type unwrap_or(none_callable && none_invoke) {
+    Type unwrap_or(none_callable && none_fn) {
         if(isNone())
-            *__ptr_v() = none_invoke();
+            *__ptr_v() = none_fn();
 
         available = false;
         return std::move(*__ptr_v());
     }
 
     ///@brief Call some_handler if statement is Some, or call none_invoke if statement is None.
-    ///@arg     some_invoke - std::functuion<Res(value_type)> object - must be provide one @e value_type type arg and returns @e Res type value
-    ///         none_invoke - std::function<Res()> object - must not provide args and returns @e Res type value
+    ///@arg     some_fn - std::functuion<Res(value_type)> object - must be provide one @e value_type type arg and returns @e Res type value
+    ///         none_fn - std::function<Res()> object - must not provide args and returns @e Res type value
     ///
     ///@warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
     template<typename Res, typename some_callable, typename none_callable>

@@ -75,11 +75,23 @@ int main(int argc, char *argv[])
     // programm exec file path
     qDebug()<<appptr_opt.unwrap()->arguments();
 
-
     appptr_opt.if_none([]{
-        qDebug()<< "wrong";
+        // in this case exec this
+        qDebug()<< "unwrapped";
     }).if_some([](QCoreApplication * app) {
+        // not this
         qDebug()<<app->arguments();
+    });
+
+    appptr_opt.match<bool>([](QCoreApplication * app){
+        // in this case not exec
+        qDebug()<< app->arguments();
+        return true;
+    },
+    [](){
+        // in this case exec this
+        qDebug()<< "unwrapped";
+        return false;
     });
 
 
