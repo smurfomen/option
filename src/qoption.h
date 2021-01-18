@@ -27,12 +27,12 @@
 #include <functional>
 #include <type_traits>
 #include <queue>
-
+#include <QString>
 template <typename Type>
 class QOption {
 public:
 #define NONE None()
-    typedef typename std::aligned_storage<sizeof (Type),  alignof(Type)> value_storage;
+    typedef typename std::aligned_storage<sizeof (Type),  alignof(Type)>::type value_storage;
     QOption(const QOption & o) = delete;
     QOption & operator=(const QOption & o) = delete;
 
@@ -66,7 +66,7 @@ public:
     }
 
     QOption(Type && t) noexcept {
-        std::swap(*__ptr_v(), t);
+        new(&value) Type(std::forward<Type>(t));
         available = true;
     }
 
@@ -74,7 +74,7 @@ public:
         return isSome() == o.isSome() && ((isSome() && *__ptr_v() == *o.__ptr_v()) || isNone());
     }
 
-    QOption & operator=(QOption && o) noexcept {
+    QOption & operator=(QOption && o) {
         if(o.isSome()) {
             *__ptr_v() = o.unwrap();
             available = true;
