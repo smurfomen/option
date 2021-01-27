@@ -4,6 +4,24 @@
 
 #include <QElapsedTimer>
 
+
+QOption<int> sum(int a, int b) {
+    int s = a+b;
+    if(s%2 == 0)
+        return s;
+
+    return None();
+}
+
+
+
+QOption<QByteArray> arr() {
+    return QByteArray(3,0);
+    // or
+    return None();
+}
+
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -15,7 +33,7 @@ int main(int argc, char *argv[])
         v.push_back(i);
 
     qDebug()<<tmr.restart();
-    auto first = QOption<std::vector<long>>::Some(std::move(v));
+    QOption<std::vector<long>> first = std::move(v);
 
      // after copy or moving first statement will be None
     auto second = std::move(first);
@@ -24,10 +42,17 @@ int main(int argc, char *argv[])
     // first.unwrap() - throws exception
     qDebug()<<tmr.elapsed();
 
+    auto sumOpt = sum(10,12);
+    qDebug()<<sumOpt.unwrap();
 
-    auto none_option = QOption<int>::NONE;
-    auto i32_option =  QOption<int>::Some(55);
-    auto appptr_opt =  QOption<QCoreApplication*>::Some(&a);
+    auto array = arr();
+    qDebug()<<array.unwrap().size();
+
+    QOption<int> none_option = None();
+    QOption<int> i32_option = 55;
+    auto a_opt = Some(&a);
+    // or
+    // QOption<QCoreApplication*> a_opt = &a;
 
     // "OOOOOPS, something wrong" - option statement is None now
     qDebug() << none_option.match<QString>(
@@ -73,9 +98,9 @@ int main(int argc, char *argv[])
 
 
     // programm exec file path
-    qDebug()<<appptr_opt.unwrap()->arguments();
+    qDebug()<<a_opt.unwrap()->arguments();
 
-    appptr_opt.if_none([]{
+    a_opt.if_none([]{
         // in this case exec this
         qDebug()<< "unwrapped";
     }).if_some([](QCoreApplication * app) {
@@ -83,7 +108,7 @@ int main(int argc, char *argv[])
         qDebug()<<app->arguments();
     });
 
-    appptr_opt.match<bool>([](QCoreApplication * app){
+    a_opt.match<bool>([](QCoreApplication * app){
         // in this case not exec
         qDebug()<< app->arguments();
         return true;

@@ -28,47 +28,51 @@
 #include <type_traits>
 #include <queue>
 #include <QString>
+#include <memory>
+struct None;
+
 template <typename Type>
 class QOption {
 public:
-#define NONE None()
     typedef typename std::aligned_storage<sizeof (Type),  alignof(Type)>::type value_storage;
-    QOption(const QOption & o) = delete;
-    QOption & operator=(const QOption & o) = delete;
 
-    QOption(QOption && o) noexcept {
-        if(o.isSome()) {
-            *__ptr_v() = o.unwrap();
-            available = true;
-        }
-        else
-            available = false;
+    QOption(Type && t) {
+        new(&value) Type(std::forward<Type>(t));
+        available = true;
     }
 
-    QOption(QOption & o) noexcept {
-        if(o.isSome()) {
-            *__ptr_v() = o.unwrap();
-            available = true;
-        }
-        else
-            available = false;
+    QOption(const Type & t) {
+        *__ptr_v() = t;
+        available = true;
     }
 
-    QOption() noexcept
+    QOption(None && ) noexcept
         : available(false)
     {
 
     }
 
-    QOption(const Type & t) noexcept {
-        *__ptr_v() = t;
-        available = true;
+    QOption(QOption && o) {
+        if(o.isSome()) {
+            value = std::move(o.value);
+            available = true;
+        }
+        else
+            available = false;
     }
 
-    QOption(Type && t) noexcept {
-        new(&value) Type(std::forward<Type>(t));
-        available = true;
+    QOption(QOption & o) {
+        if(o.isSome()) {
+            value = o.value;
+            available = true;
+        }
+        else
+            available = false;
     }
+
+    QOption(const QOption & o) = delete;
+
+    QOption & operator=(const QOption & o) = delete;
 
     bool operator==(const QOption & o) {
         return isSome() == o.isSome() && ((isSome() && *__ptr_v() == *o.__ptr_v()) || isNone());
@@ -76,7 +80,7 @@ public:
 
     QOption & operator=(QOption && o) {
         if(o.isSome()) {
-            *__ptr_v() = o.unwrap();
+            value = std::move(o.value);
             available = true;
         }
         else
@@ -85,7 +89,7 @@ public:
         return *this;
     }
 
-    QOption & operator=(QOption & o) noexcept {
+    QOption & operator=(QOption & o) {
         if(o.isSome()) {
             o.available = false;
             value = o.value;
@@ -97,19 +101,20 @@ public:
         return *this;
     }
 
-    ///@brief Create QOption None value
-    static QOption None() {
-        return QOption();
+    QOption & operator=(const Type & t) {
+        if(available) {
+            std::unique_ptr<Type> p = std::unique_ptr<Type>(__ptr_v());
+        }
+
+        *__ptr_v() = t;
+        available = true;
+
+        return *this;
     }
 
-    ///@brief Create QOption Some value use copy val into QOption value
-    static QOption Some(const Type & val) {
-        return QOption(val);
-    }
-
-    ///@brief Create QOption Some value use forwarding val into QOption value
-    static QOption Some(Type && val) {
-        return QOption(std::forward<Type>(val));
+    QOption & operator=(None &&)  {
+        available = false;
+        return *this;
     }
 
     ///@brief Returns true if statement is None
@@ -212,6 +217,20 @@ private:
     ///@brief aligned storage with @e keeping data of value
     value_storage value;
 };
+
+struct None { };
+
+template<typename T>
+QOption<T> Some(T && v)
+{
+    return QOption<T>(std::forward<T>(v));
+}
+
+template<typename T>
+QOption<T> Some(const T & v)
+{
+    return QOption<T>(v);
+}
 
 #endif // QOPTION_H
 
