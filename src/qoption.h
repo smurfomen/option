@@ -117,11 +117,20 @@ public:
         return *this;
     }
 
+    explicit operator bool() const noexcept {
+        return isSome();
+    }
+
+
+    bool operator!() const noexcept {
+        return isNone();
+    }
+
     ///@brief Returns true if statement is None
-    bool isNone() const { return !available; }
+    bool isNone() const noexcept { return !available; }
 
     ///@brief Returns true if statement is Some
-    bool isSome() const { return available; }
+    bool isSome() const noexcept { return available; }
 
     ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for some case
     template<typename some_callable>

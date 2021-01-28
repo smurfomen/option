@@ -43,10 +43,12 @@ int main(int argc, char *argv[])
     qDebug()<<tmr.elapsed();
 
     auto sumOpt = sum(10,12);
-    qDebug()<<sumOpt.unwrap();
+    if(sumOpt)
+        qDebug()<<sumOpt.unwrap();
 
     auto array = arr();
-    qDebug()<<array.unwrap().size();
+    if(array)
+        qDebug()<<array.unwrap().size();
 
     QOption<int> none_option = None();
     QOption<int> i32_option = 55;
@@ -60,7 +62,7 @@ int main(int argc, char *argv[])
                         return QString::number(val);
                     },
                     [&]{
-                        return "OOOOOPS, something wrong";
+                        return "match: none_option is None, return this string";
                     });
 
     // "0x37" - is string value 55 as hex
@@ -69,7 +71,7 @@ int main(int argc, char *argv[])
                         return "0x"+QString::number(val, 16);
                     },
                     [&]{
-                        return "OOOOOPS, something wrong";
+                        return "match: i32_option is None, return this string";
                     });
 
     // false - value already moved and option statement is None now
@@ -81,18 +83,24 @@ int main(int argc, char *argv[])
                         return false;
                     });
 
+    i32_option = 44;
+    if(i32_option)
+        qDebug()<<"explicit bool () operator: i32_option is Some";
+
     // 777 - default value
     qDebug()<<none_option.unwrap_def(777);
+    if(!none_option)
+        qDebug()<<"bool ! operator: none_option is None";
 
     // print "SORRY, IT'S NONE OPTION" and print 0 - option already moved and statement is None now
     qDebug()<<i32_option.unwrap_or([&](){
-            qDebug()<<"SORRY, IT'S NONE OPTION";
+            qDebug()<<"unwrap_or: i32_option already been unwrapped, return 0";
             return 0;
     });
 
     // 0 and print "SORRY, IT'S NONE OPTION" - option statement is None now
     qDebug()<<none_option.unwrap_or([&](){
-            qDebug()<<"SORRY, IT'S NONE OPTION";
+            qDebug()<<"unwrap_or: sorry, none_option already been unwrapped, return 0";
             return 0;
     });
 
@@ -102,7 +110,7 @@ int main(int argc, char *argv[])
 
     a_opt.if_none([]{
         // in this case exec this
-        qDebug()<< "unwrapped";
+        qDebug()<< "compousing: a_opt already been unwrapped";
     }).if_some([](QCoreApplication * app) {
         // not this
         qDebug()<<app->arguments();
@@ -115,7 +123,7 @@ int main(int argc, char *argv[])
     },
     [](){
         // in this case exec this
-        qDebug()<< "unwrapped";
+        qDebug()<< "match: a_opt already been unwrapped, return false";
         return false;
     });
 
