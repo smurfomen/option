@@ -15,18 +15,31 @@ Good way for example:
 ```C++
 QOption<MyClass*> getMyClass() {
   if(expression)
-     return QOption<MyClass*>::Some(new MyClass(args..));
-  else
-     return QOption<MyClass*>::NONE;
+     return new MyClass(args..);
+
+  return None();
 }
 ```
 ## Use cases
 <br>Check before use</br>
 ```C++
-auto o_mc = getMyClass();
-if(o_mc.isSome())
-    o_mc.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
+auto option = getMyClass();
+if(option)
+    option.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
+// or
+if(!option)
+   doSomething();
 ```
+
+<br>Option can be unwrapped one time</br>
+```C++
+auto option = getMyClass();
+if(option) {
+    option.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
+    doSomething(option.unwrap()); // throw exception !
+}
+```
+
 <br>Get a value or throwing std::logic_error type exception</br>
 ```C++
 try {
@@ -84,8 +97,8 @@ bool success = getObject().match<bool>(
 ```
 <br>Composing handling</br>
 ```C++
-QOption<MyClass*> o_mc = getMyClass();
-o_mc.if_some([&](MyClass * obj){
+QOption<MyClass*> option = getMyClass();
+option.if_some([&](MyClass * obj){
     foo(obj);
 }).if_none([]() {
     log("Error handle");
