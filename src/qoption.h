@@ -42,7 +42,7 @@ public:
     }
 
     QOption(const Type & t) {
-        *__ptr_v() = t;
+        new (&value) Type(t);
         available = true;
     }
 
