@@ -1,4 +1,9 @@
 HEADERS += \
     $$PWD/src/qoption.h
 
-INCLUDEPATH += $$PWD/src/
+INCLUDEPATH += $$PWD/
+
+DISTFILES += \
+        $$PWD/QOption
+
+CONFIG += QOPTION_INCLUDED
