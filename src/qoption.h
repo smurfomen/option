@@ -63,7 +63,7 @@ public:
 
     QOption(QOption & o) {
         if(o.isSome()) {
-            value = o.value;
+            value = o.unwrap();
             available = true;
         }
         else
