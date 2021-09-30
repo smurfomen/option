@@ -29,10 +29,23 @@
 #include <queue>
 #include <QString>
 #include <memory>
-struct None;
+
+struct None { };
 
 template <typename Type>
 class QOption {
+    // For generic types that are functors, delegate to its 'operator()'
+    template <typename _FnT>
+    struct __match_function_traits
+        : public __match_function_traits<decltype(&_FnT::operator())>
+    {};
+
+    // for pointers to member function
+    template <typename ClassType, typename ReturnType, typename... Args>
+    struct __match_function_traits<ReturnType(ClassType::*)(Args...) const> {
+        typedef std::function<ReturnType (Args...)> f_type;
+    };
+
 public:
     typedef typename std::aligned_storage<sizeof (Type),  alignof(Type)>::type value_storage;
 
@@ -133,16 +146,16 @@ public:
     bool isSome() const noexcept { return available; }
 
     ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for some case
-    template<typename some_callable>
-    QOption & if_some(some_callable && fn) {
-        if(isSome())
-            fn(*__ptr_v());
+    QOption & if_some(std::function<void(Type &&)> && fn) {
+        if(isSome()) {
+            available = false;
+            fn(std::move(*__ptr_v()));
+        }
         return *this;
     }
 
     ///@brief Return QOptionComposer object for compose handlers, already contained @e fn handler for none case
-    template <typename none_callable>
-    QOption & if_none(none_callable && fn) {
+    QOption & if_none(std::function<void()> && fn) {
         if(isNone())
             fn();
         return *this;
@@ -185,14 +198,15 @@ public:
     ///         none_fn - std::function<Res()> object - must not provide args and returns @e Res type value
     ///
     ///@warning be careful if using [&] in functors, scope of lambda drops after exit from scope. Intstead of this use move-semantic or copy current scope.
-    template<typename Res, typename some_callable, typename none_callable>
-    Res match(some_callable && some_fn, none_callable && none_fn) {
+    template<typename _FnSome, class _Res = typename __match_function_traits<_FnSome>::f_type::result_type, class _FnNone = typename std::function<_Res()>>
+    _Res match(_FnSome && some_fn, _FnNone && none_fn) {
         if(isNone())
             return none_fn();
 
         available = false;
         return some_fn(std::move(*__ptr_v()));
     }
+
 
     ///@brief Returns value if statement is Some, or def_value if statement is None
     Type unwrap_def(const Type & def_value) {
@@ -226,8 +240,6 @@ private:
     ///@brief aligned storage with @e keeping data of value
     value_storage value;
 };
-
-struct None { };
 
 template<typename T>
 QOption<T> Some(T && v)
