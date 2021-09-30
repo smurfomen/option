@@ -84,7 +84,7 @@ try {
 <br>Match result and handle it with custom handlers</br>
 ```C++
 MyClass * request = ...';
-bool success = getObject().match<bool>(
+bool success = getObject().match(
             [&](MyClass * pack) -> bool{
                 return pack->export() && HandleResponse(pack);
             },
