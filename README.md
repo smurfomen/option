@@ -36,7 +36,7 @@ if(!option)
 auto option = getMyClass();
 if(option) {
     option.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
-    doSomething(option.unwrap()); // throw exception !
+    doSomething(option.unwrap()); // QUnwrapException will throw!
 }
 ```
 
@@ -44,7 +44,7 @@ if(option) {
 ```C++
 try {
     MyClass * mc = getMyClass().unwrap();
-} catch (std::logic_error & le) {
+} catch (QUnwrapException & ue) {
     // Option is None value
 }
 ```
@@ -68,9 +68,9 @@ const char * connection = createConnectionString(params).unwrap_or([]{ return "s
 <br>Get some value or throwing std::logic_error type exception with an error message</br>
 ```C++
 try {
-     MyClass * mc = getMyClass().expect("Something is wrong. Exception std::logic_error.");
-} catch (std::logic_error & le) {
-    // Option is None value
+     MyClass * mc = getMyClass().expect("Something is wrong. Exception QUnwrapException will throw.");
+} catch (QUnwrapException & ue) {
+    // Something is wrong. Exception QUnwrapException will throw.
 }
 ```
 <br>Get some value or throwing MyCustomException with an error message</br>
@@ -78,7 +78,7 @@ try {
 try {
     MyClass * mc = getMyClass().expect<MyCustomException>("Something wrong. Exception MyCustomException.");    
 } catch (MyCustomException & mce) {
-    // Option is None value
+    // Something wrong. Exception MyCustomException.
 }
 ```
 <br>Match result and handle it with custom handlers</br>

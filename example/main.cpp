@@ -12,9 +12,43 @@ QOption<uint> someFileDescriptor(){
 #endif
 }
 
+QOption<int> safeDevide(int a, int b) {
+    if(b == 0)
+        return None();
+
+    return a / b;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+
+    /* good usecases */
+    {
+        auto devided = safeDevide(25,25);
+        if(devided)
+        {
+            qDebug() << devided.unwrap();
+        }
+
+
+        auto errorDevide = safeDevide(25, 0);
+        try {
+            qDebug() << errorDevide.expect("devide is fail");
+        } catch (QUnwrapException & re) {
+            qDebug () << "exception:" << re.what();
+        }
+
+        {
+            auto fd = someFileDescriptor();
+            if(fd)
+                qDebug() << fd.unwrap();
+            else
+                qDebug() << "file descriptor not found";
+        }
+
+    }
+
 
     /* unwrap */
     {
@@ -35,29 +69,23 @@ int main(int argc, char *argv[])
         {
             try {
                 qDebug() << option.unwrap();
-            }  catch (std::logic_error &le) {
+            }  catch (QUnwrapException &le) {
                 qDebug() << "Invalid value in option:" << le.what();
             }
 
             /* or */
             try{
-                qDebug() << option.unwrap<std::runtime_error>();
-            } catch(std::runtime_error & re) {
+                qDebug() << option.unwrap<std::logic_error>();
+            } catch(std::logic_error & re) {
                 qDebug() << "Invalid value in option:" << re.what();
             }
 
             /* or if you want customize message */
             try{
                 qDebug() << option.expect("Sorry, option is empty");
-            } catch(std::logic_error & le) {
-                qDebug() << "Invalid value in option:" << le.what();
+            } catch(...) {
+                qDebug() << "Invalid value in option";
             }
-        }
-
-        {
-            auto fd = someFileDescriptor();
-            if(fd)
-                qDebug() << fd.expect("file descriptor not found");
         }
     }
 
