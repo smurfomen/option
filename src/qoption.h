@@ -26,7 +26,6 @@
 #define QOPTION_H
 #include <functional>
 #include <type_traits>
-#include <queue>
 #include <memory>
 #include <stdexcept>
 
@@ -63,11 +62,13 @@ public:
     using storage_t = typename std::aligned_storage<sizeof (Type),  alignof(Type)>::type;
 
     QOption(Type && t) {
-        bound(std::forward<Type>(t));
+        available = true;
+        new(&value) Type(std::forward<Type>(t));
     }
 
     QOption(const Type & t) {
-        bound(t);
+        available = true;
+        new(&value) Type(t);
     }
 
     QOption(None && ) noexcept
@@ -76,18 +77,60 @@ public:
 
     }
 
+
     QOption(QOption && o)
         : available(false)
     {
-        if(o)
-            bound(o.unwrap());
+        std::swap(value, o.value);
+        std::swap(available, o.available);
+        o.unbound();
     }
 
     QOption(QOption & o)
         : available(false)
     {
-        if(o)
-            bound(o.unwrap());
+        std::swap(value, o.value);
+        std::swap(available, o.available);
+        o.unbound();
+    }
+
+    QOption & operator=(None &&)  {
+        unbound();
+        return *this;
+    }
+
+    QOption & operator=(const Type & t) {
+        unbound();
+
+        available = true;
+        new(&value) Type(t);
+
+        return *this;
+    }
+
+    QOption & operator=(Type && t) {
+        unbound();
+
+        available = true;
+        new(&value) Type(std::forward<Type>(t));
+
+        return *this;
+    }
+
+    QOption & operator=(QOption && o) {
+        std::swap(value, o.value);
+        std::swap(available, o.available);
+        o.unbound();
+
+        return *this;
+    }
+
+    QOption & operator=(QOption & o) {
+        std::swap(value, o.value);
+        std::swap(available, o.available);
+        o.unbound();
+
+        return *this;
     }
 
     QOption(const QOption & o) = delete;
@@ -96,36 +139,6 @@ public:
 
     bool operator==(const QOption & o) {
         return isSome() == o.isSome() && (isSome() && *__ptr_v() == *o.__ptr_v);
-    }
-
-    QOption & operator=(QOption && o) {
-        if(o)
-            bound(std::forward<value_t>(o.unwrap()));
-
-        else if(isSome())
-            unbound();
-
-        return *this;
-    }
-
-    QOption & operator=(QOption & o) {
-        if(o)
-            bound(o.unwrap());
-
-        else if(isSome())
-            unbound();
-
-        return *this;
-    }
-
-    QOption & operator=(const Type & t) {
-        bound(t);
-        return *this;
-    }
-
-    QOption & operator=(None &&)  {
-        unbound();
-        return *this;
     }
 
     explicit operator bool() const noexcept {

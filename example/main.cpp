@@ -75,14 +75,14 @@ int main(int argc, char *argv[])
 
             /* or */
             try{
-                qDebug() << option.unwrap<std::logic_error>();
+                qDebug() << option.expect<std::logic_error>("Sorry, option is empty");
             } catch(std::logic_error & re) {
                 qDebug() << "Invalid value in option:" << re.what();
             }
 
             /* or if you want customize message */
             try{
-                qDebug() << option.expect("Sorry, option is empty");
+                qDebug() << option.unwrap();
             } catch(...) {
                 qDebug() << "Invalid value in option";
             }
