@@ -276,7 +276,7 @@ private:
             std::unique_ptr<Type> p = std::unique_ptr<Type>(__ptr_v());
         }
         available = false;
-        memset(&value, 0, sizeof(value));
+	std::fill_n((char*)&value, sizeof value, 0);
     }
 
     value_t * __ptr_v() {
