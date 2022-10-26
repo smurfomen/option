@@ -43,7 +43,7 @@ public:
 
 struct None { };
 
-template <typename Type>
+template <typename T>
 class QOption {
     // For generic types that are functors, delegate to its 'operator()'
     template <typename _FnT>
@@ -58,90 +58,65 @@ class QOption {
     };
 
 public:
-    using value_t = Type;
-    using storage_t = typename std::aligned_storage<sizeof (Type),  alignof(Type)>::type;
+	using type = T;
+	using storage_type = typename std::aligned_storage<sizeof (type),  alignof(type)>::type;
 
-    QOption(Type && t) {
-        available = true;
-        new(&value) Type(std::forward<Type>(t));
-    }
+	QOption(type && t)
+		: p(new(&value) type(std::forward<type>(t)))
+	{ }
 
-    QOption(const Type & t) {
-        available = true;
-        new(&value) Type(t);
-    }
+	QOption(const type & t)
+		: p(new(&value) type(t))
+	{ }
 
     QOption(None && ) noexcept
-        : available(false)
-    {
-
-    }
-
+		: p(nullptr)
+	{ }
 
     QOption(QOption && o)
-        : available(false)
+		: p(nullptr)
     {
         std::swap(value, o.value);
-        std::swap(available, o.available);
-        o.unbound();
+		std::swap(p, o.p);
     }
 
-    QOption(QOption & o)
-        : available(false)
-    {
-        std::swap(value, o.value);
-        std::swap(available, o.available);
-        o.unbound();
-    }
-
-    QOption & operator=(None &&)  {
-        unbound();
-        return *this;
-    }
-
-    QOption & operator=(const Type & t) {
-        unbound();
-
-        available = true;
-        new(&value) Type(t);
+	QOption & operator=(None &&)  {
+		p.reset();
 
         return *this;
     }
 
-    QOption & operator=(Type && t) {
-        unbound();
-
-        available = true;
-        new(&value) Type(std::forward<Type>(t));
+	QOption & operator=(const type & t) {
+		p.reset(new(&value) type(t));
 
         return *this;
     }
 
-    QOption & operator=(QOption && o) {
-        std::swap(value, o.value);
-        std::swap(available, o.available);
-        o.unbound();
+	QOption & operator=(type && t) {
+		p.reset(new(&value) type(std::forward<type>(t)));
 
-        return *this;
-    }
+		return *this;
+	}
 
-    QOption & operator=(QOption & o) {
-        std::swap(value, o.value);
-        std::swap(available, o.available);
-        o.unbound();
+	QOption & operator=(QOption && o) {
+		if(o != this) {
+			std::swap(value, o.value);
+			std::swap(p, o.p);
+		}
+		return *this;
+	}
 
-        return *this;
-    }
-
-    QOption(const QOption & o) = delete;
+	QOption(QOption & o) = delete;
+	QOption(const QOption & o) = delete;
 
     QOption & operator=(const QOption & o) = delete;
+	QOption & operator=(QOption & o) = delete;
 
     bool operator==(const QOption & o) {
-        return isSome() == o.isSome() && (isSome() && *__ptr_v() == *o.__ptr_v);
+		return isSome() == o.isSome() && (isSome() && *p == *o.p);
     }
 
-    explicit operator bool() const noexcept {
+	operator bool() const noexcept {
         return isSome();
     }
 
@@ -151,10 +126,10 @@ public:
     }
 
     /*! \brief  Returns true if statement is None. */
-    bool isNone() const noexcept { return !available; }
+	bool isNone() const noexcept { return !p.get(); }
 
     /*! \brief  Returns true if statement is Some. */
-    bool isSome() const noexcept { return available; }
+	bool isSome() const noexcept { return p.get(); }
 
     /*!
      * \brief  Return QOptionComposer object for compose handlers, already contained \e fn handler for some case.
@@ -163,10 +138,9 @@ public:
      *          Otherwise, if call trace look like if_some -> if_none it's bad way, becouse if statement was Some that if_some function will be unwrapped value
      *          and statement will be changed to None, and later if_none will be executed too, becouse statement already is None
      */
-    QOption & if_some(std::function<void(value_t &&)> && fn) {
+	QOption & if_some(std::function<void(type &&)> && fn) {
         if(isSome()) {
-            available = false;
-            fn(std::move(*__ptr_v()));
+			fn(std::move(*p.release()));
         }
         return *this;
     }
@@ -187,23 +161,21 @@ public:
 
     /*! \brief  Returns value if statement is Some, or throws E type exception if statement is None. */
     template< typename E = QUnwrapException>
-    value_t unwrap() {
+	type unwrap() {
         if(isNone())
             throw E("Option is None value");
 
-        available = false;
-        return std::move(*__ptr_v());
+		return *p.release();
     }
 
 
     /*! \brief  Returns value if statement is Some, or E type exception with text message if statement is None. */
     template <typename E = QUnwrapException>
-    value_t expect (const char * text) {
+	type expect (const char * text) {
         if(isNone())
             throw E(text);
 
-        available = false;
-        return std::move(*__ptr_v());
+		return *p.release();
     }
 
     /*!
@@ -211,12 +183,12 @@ public:
      *  \arg    none_fn - std::function<value_t()> object - must not provide args and returns @e value_t value
      */
     template<typename none_callable>
-    value_t unwrap_or(none_callable && none_fn) {
-        if(isNone())
-            bound(std::forward<value_t>(none_fn()));
+	type unwrap_or(none_callable && none_fn) {
+		if(isNone()) {
+			p.reset(new(&value) type(std::forward<type>(none_fn())));
+		}
 
-        available = false;
-        return std::move(*__ptr_v());
+		return *p.release();
     }
 
     /*!
@@ -230,64 +202,33 @@ public:
         if(isNone())
             return none_fn();
 
-        available = false;
-        return some_fn(std::move(*__ptr_v()));
+		return some_fn(std::move(*p.release()));
     }
 
 
     /*! \brief  Returns value if statement is Some, or def_value if statement is None. */
-    value_t unwrap_def(const value_t & def_value) {
+	type unwrap_def(const type & def_value) {
         if(isNone())
-            // copy
-            *__ptr_v() = def_value;
+			return def_value;
 
-        available = false;
-        return std::move(*__ptr_v());
+		return *p.release();
     }
 
 
     /*! \brief  Returns value if statement is Some, or def_value if statement is None. */
-    value_t unwrap_def(value_t && def_value) {
-        if(isNone())
-            bound(std::forward<value_t>(def_value));
+	type unwrap_def(type && def_value) {
+		if(isNone()) {
+			p.reset(new(&value) type(std::forward<type>(def_value)));
+		}
 
-        available = false;
-        return std::move(*__ptr_v());
+		return *p.release();
     }
 
 private:
-    void bound(value_t && v) {
-        if(isSome())
-        {
-            std::unique_ptr<Type> p = std::unique_ptr<Type>(__ptr_v());
-        }
-        available = true;
-        new(&value) Type(std::forward<Type>(v));
-    }
-
-    void bound(const value_t & v) {
-        available = true;
-        new(&value) Type(v);
-    }
-
-    void unbound() {
-        if(isSome())
-        {
-            std::unique_ptr<Type> p = std::unique_ptr<Type>(__ptr_v());
-        }
-        available = false;
-	std::fill_n((char*)&value, sizeof value, 0);
-    }
-
-    value_t * __ptr_v() {
-        return reinterpret_cast<value_t*>(&value);
-    }
-
-    /*! \brief  validation statement */
-    bool available {false};
+	std::unique_ptr<type> p;
 
     /*! \brief  aligned storage with @e keeping data of value. */
-    storage_t value;
+	storage_type value;
 };
 
 template<typename T>

@@ -6,7 +6,7 @@
 
 QOption<uint> someFileDescriptor(){
 #if 1
-    return 255;
+	return 3;
 #else
     return None();
 #endif
@@ -19,30 +19,29 @@ QOption<int> safeDevide(int a, int b) {
     return a / b;
 }
 
+
+#define TEST(x1,x2) Q_ASSERT(x1 == x2)
+
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
     /* good usecases */
     {
-        auto devided = safeDevide(25,25);
-        if(devided)
-        {
-            qDebug() << devided.unwrap();
-        }
+		TEST(safeDevide(25,25).unwrap(), 1);
 
-
-        auto errorDevide = safeDevide(25, 0);
-        try {
-            qDebug() << errorDevide.expect("devide is fail");
-        } catch (QUnwrapException & re) {
-            qDebug () << "exception:" << re.what();
-        }
+		{
+			auto errorDevide = safeDevide(25, 0);
+			try {
+				qDebug() << errorDevide.expect("devide is fail");
+			} catch (QUnwrapException & e) { qDebug () << "exception:" << e.what(); }
+		}
 
         {
             auto fd = someFileDescriptor();
             if(fd)
-                qDebug() << fd.unwrap();
+				qDebug() << "file descriptor:" << fd.unwrap();
             else
                 qDebug() << "file descriptor not found";
         }
@@ -56,89 +55,92 @@ int main(int argc, char *argv[])
         /* other case for create: QOption<int> option (255) or auto option = Some(255) */
         QOption<int> option = 255;
 
-        /* print 55 */
-        qDebug() << option.unwrap();
+		TEST(option.unwrap(), 255);
 
         /* reset new value to option and print */
         option = 128;
-        if(option) {
-            qDebug()<<"explicit bool () operator: digit contains value" << option.unwrap();
-        }
+		TEST(option.unwrap(), 128);
+
 
         /* with catch exception */
-        {
-            try {
-                qDebug() << option.unwrap();
-            }  catch (QUnwrapException &le) {
-                qDebug() << "Invalid value in option:" << le.what();
-            }
+		{
+			/* unwrap */
+			{
+				try {
+					qDebug() << option.unwrap();
+				}  catch (QUnwrapException &e) { qDebug() << e.what(); }
 
-            /* or */
-            try{
-                qDebug() << option.expect<std::logic_error>("Sorry, option is empty");
-            } catch(std::logic_error & re) {
-                qDebug() << "Invalid value in option:" << re.what();
-            }
+				/* or */
+				try {
+					qDebug() << option.unwrap<std::runtime_error>();
+				}  catch (std::runtime_error &e) { qDebug() << e.what(); }
+			}
 
-            /* or if you want customize message */
-            try{
-                qDebug() << option.unwrap();
-            } catch(...) {
-                qDebug() << "Invalid value in option";
-            }
-        }
-    }
+			/* expect */
+			{
+				try{
+					qDebug() << option.expect("Sorry, option is empty");
+				} catch(QUnwrapException &e) { qDebug() << e.what(); }
+
+				/* or */
+				try{
+					qDebug() << option.expect<std::logic_error>("Sorry, option is empty");
+				} catch(std::logic_error & e) { qDebug() << e.what(); }
+			}
+		}
+	}
 
     /* unwrap or default value */
     {
         QOption<int> option = None();
 
-        /* print 777 */
-        qDebug()<<option.unwrap_def(777);
-        if(!option)
-            qDebug()<<"bool ! operator: option is None";
-    }
+		/* print 777 */
+		TEST(option.unwrap_def(777), 777);
+	}
 
-    /* unwrap or exec function */
-    {
-        auto option = Some(255);
-        /* print 255 */
-        qDebug() << option.unwrap_or([&](){
-                qDebug()<<"unwrap_or: option is none, return 0";
-                return 0;
-        });
+	/* unwrap or exec function */
+	{
+		auto option = Some(255);
+		/* print 255 */
+		TEST(option.unwrap_or([&](){
+			qDebug()<<"unwrap_or: option is none, return 0";
+			return 0;
+		}), 255);
 
-        /* print none message, because option already have been unwrapped */
-        qDebug() << option.unwrap_or([&](){
-                qDebug()<<"unwrap_or: option is none, return 0";
-                return 0;
-        });
-    }
 
-    /* mathing */
-    {
-        {
-            /* option is QOption<int> type value */
-            /* other case: QOption<int> option (255) */
-            auto option = Some(255);
+		/* print none message, because option already have been unwrapped */
+		TEST(option.unwrap_or([&](){
+			qDebug()<<"unwrap_or: option is none, return 0";
+			return 0;
+		}), 0);
+	}
 
-            /* print 0xff */
-            qDebug() << option.match(
-            [&](int val){
-                return "0x"+QString::number(val, 16);
-            },
+	/* mathing */
+	{
+		{
+			/* option is QOption<int> type value */
+			auto option = Some(255);
+
+			/* str == 0xff */
+			auto str = option.match(
+			[&](int val){
+				return "0x"+QString::number(val, 16);
+			},
+			[&]{
+				return "match: option is None, return this string";
+			});
+			TEST(str, "0xff");
+
+			/* exec none branch, because option already been unwrapped */
+			auto strerr = option.match(
+			[&](int val){
+				return "0x"+QString::number(val, 16);
+			},
             [&]{
                 return "match: option is None, return this string";
             });
 
-            /* exec none branch, because option already been unwrapped */
-            qDebug() << option.match(
-            [&](int val){
-                return "0x"+QString::number(val, 16);
-            },
-            [&]{
-                return "match: option is None, return this string";
-            });
+			TEST(strerr, "match: option is None, return this string");
         }
 
 
@@ -161,6 +163,8 @@ int main(int argc, char *argv[])
             [](){
                 return QPair<bool, QString>(false, "match: option is none, return false");
             });
+
+			TEST(status.first, true);
 
             /* print application args */
             qDebug() << status.second;
