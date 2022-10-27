@@ -1,10 +1,49 @@
 #include <QCoreApplication>
-#include <QOption>
+#include <option>
 #include <QDebug>
+#include <ctime>
+#define MOVE_SEM 1
 
 
+struct A {
+	int x;
+	A() : x(100) { }
+	A(int x) : x(x) { }
 
-QOption<uint> someFileDescriptor(){
+	~A() {
+		qDebug() << "dtor" << x;
+	}
+
+	A(const A & lhs) {
+		qDebug() << "copy ctor";
+		x = lhs.x;
+	}
+
+#if MOVE_SEM == 1
+	A(A && lhs) {
+		qDebug() << "move ctor";
+		std::swap(x, lhs.x);
+	}
+#endif
+};
+
+
+option<A> foo() {
+	return A(1);
+}
+
+option<A> bar() {
+	A x(2);
+	return x;
+}
+
+std::array<int, 10000> gl;
+option<std::array<int,10000>> check_arr() {
+	return gl;
+}
+
+
+option<uint> someFileDescriptor(){
 #if 1
 	return 3;
 #else
@@ -12,20 +51,58 @@ QOption<uint> someFileDescriptor(){
 #endif
 }
 
-QOption<int> safeDevide(int a, int b) {
+option<int> safeDevide(int a, int b) {
     if(b == 0)
-        return None();
+		return none_option();
 
     return a / b;
 }
 
 
-#define TEST(x1,x2) Q_ASSERT(x1 == x2)
+#define TEST(x1,x2) Q_ASSERT((x1) == (x2))
 
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+
+	{
+		auto o1 = foo();			// move ctor
+		qDebug() << o1.unwrap().x;	// 1
+
+		o1 = bar();					// move ctor
+		qDebug() << o1.unwrap().x;	// 2
+
+		o1 = none_option();				// [clear value]
+
+		o1 = some_option(A{3});			// move ctor
+		qDebug() << o1.unwrap().x;	// 3
+
+		{
+			A c{4};
+			o1 = c;						// copy ctor
+			qDebug() << o1.unwrap().x;	// 4
+		}	// delete not moved c
+
+		A m{5};
+		o1 = std::move(m);			// move ctor
+		qDebug() << o1.unwrap().x;	// 5
+	}
+
+
+	/* check big data returned using optional type */
+	{
+		std::srand(std::time(nullptr));
+		for(int i = 0; i < 10000; ++i)
+		{
+			gl[i] = std::rand()%50;
+		}
+
+		auto chgl = check_arr().unwrap();
+
+		TEST(chgl == gl, true);
+	}
+
 
     /* good usecases */
     {
@@ -35,7 +112,7 @@ int main(int argc, char *argv[])
 			auto errorDevide = safeDevide(25, 0);
 			try {
 				qDebug() << errorDevide.expect("devide is fail");
-			} catch (QUnwrapException & e) { qDebug () << "exception:" << e.what(); }
+			} catch (unwrap_exception & e) { qDebug () << "exception:" << e.what(); }
 		}
 
         {
@@ -53,7 +130,7 @@ int main(int argc, char *argv[])
     {
         /* create option */
         /* other case for create: QOption<int> option (255) or auto option = Some(255) */
-        QOption<int> option = 255;
+		option<int> option = 255;
 
 		TEST(option.unwrap(), 255);
 
@@ -68,7 +145,7 @@ int main(int argc, char *argv[])
 			{
 				try {
 					qDebug() << option.unwrap();
-				}  catch (QUnwrapException &e) { qDebug() << e.what(); }
+				}  catch (unwrap_exception &e) { qDebug() << e.what(); }
 
 				/* or */
 				try {
@@ -80,7 +157,7 @@ int main(int argc, char *argv[])
 			{
 				try{
 					qDebug() << option.expect("Sorry, option is empty");
-				} catch(QUnwrapException &e) { qDebug() << e.what(); }
+				} catch(unwrap_exception &e) { qDebug() << e.what(); }
 
 				/* or */
 				try{
@@ -92,7 +169,7 @@ int main(int argc, char *argv[])
 
     /* unwrap or default value */
     {
-        QOption<int> option = None();
+		option<int> option = none_option();
 
 		/* print 777 */
 		TEST(option.unwrap_def(777), 777);
@@ -100,7 +177,7 @@ int main(int argc, char *argv[])
 
 	/* unwrap or exec function */
 	{
-		auto option = Some(255);
+		auto option = some_option(255);
 		/* print 255 */
 		TEST(option.unwrap_or([&](){
 			qDebug()<<"unwrap_or: option is none, return 0";
@@ -119,7 +196,7 @@ int main(int argc, char *argv[])
 	{
 		{
 			/* option is QOption<int> type value */
-			auto option = Some(255);
+			auto option = some_option(255);
 
 			/* str == 0xff */
 			auto str = option.match(
@@ -145,7 +222,7 @@ int main(int argc, char *argv[])
 
 
         {
-            auto option = Some(&a);
+			auto option = some_option(&a);
             // or
             // QOption<QCoreApplication*> option = &a;
 

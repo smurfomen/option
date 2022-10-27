@@ -18,7 +18,7 @@ SOURCES += \
         main.cpp
 
 
-include(../qoption.pri)
+include(../option.pri)
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

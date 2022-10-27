@@ -22,29 +22,29 @@
     SOFTWARE.
                                                                                     */
 
-#ifndef QOPTION_H
-#define QOPTION_H
+#ifndef OPTION_H
+#define OPTION_H
 #include <functional>
 #include <type_traits>
 #include <memory>
 #include <stdexcept>
 
-class QUnwrapException : public std::runtime_error
+class unwrap_exception : public std::runtime_error
 {
 public:
   explicit
-  QUnwrapException(const std::string& errstr) : std::runtime_error(errstr)
+  unwrap_exception(const std::string& errstr) : std::runtime_error(errstr)
   { };
 
   explicit
-  QUnwrapException(const char* errstr) : std::runtime_error(errstr)
+  unwrap_exception(const char* errstr) : std::runtime_error(errstr)
   { };
 };
 
-struct None { };
+struct none_option { };
 
 template <typename T>
-class QOption {
+class option {
     // For generic types that are functors, delegate to its 'operator()'
     template <typename _FnT>
     struct __match_function_traits
@@ -61,58 +61,58 @@ public:
 	using type = T;
 	using storage_type = typename std::aligned_storage<sizeof (type),  alignof(type)>::type;
 
-	QOption(type && t)
-		: p(new(&value) type(std::forward<type>(t)))
+	option(type && t)
+		: p(new type(std::forward<type>(t)))
+	{
+
+	}
+
+	option(const type & t)
+		: p(new type(t))
 	{ }
 
-	QOption(const type & t)
-		: p(new(&value) type(t))
-	{ }
-
-    QOption(None && ) noexcept
+	option(none_option && ) noexcept
 		: p(nullptr)
 	{ }
 
-    QOption(QOption && o)
+	option(option && lhs)
 		: p(nullptr)
-    {
-        std::swap(value, o.value);
-		std::swap(p, o.p);
-    }
+    {	
+		std::swap(p, lhs.p);
+	}
 
-	QOption & operator=(None &&)  {
+	option & operator=(none_option &&)  {
 		p.reset();
 
         return *this;
     }
 
-	QOption & operator=(const type & t) {
-		p.reset(new(&value) type(t));
+	option & operator=(const type & t) {
+		p.reset(new type(t));
 
         return *this;
     }
 
-	QOption & operator=(type && t) {
-		p.reset(new(&value) type(std::forward<type>(t)));
+	option & operator=(type && t) {
+		p.reset(new type(std::forward<type>(t)));
 
 		return *this;
 	}
 
-	QOption & operator=(QOption && o) {
-		if(o != this) {
-			std::swap(value, o.value);
-			std::swap(p, o.p);
+	option & operator=(option && lhs) {
+		if(this != &lhs) {
+			std::swap(p, lhs.p);
 		}
 		return *this;
 	}
 
-	QOption(QOption & o) = delete;
-	QOption(const QOption & o) = delete;
+	option(option & o) = delete;
+	option(const option & o) = delete;
 
-    QOption & operator=(const QOption & o) = delete;
-	QOption & operator=(QOption & o) = delete;
+	option & operator=(const option & o) = delete;
+	option & operator=(option & o) = delete;
 
-    bool operator==(const QOption & o) {
+	bool operator==(const option & o) {
 		return isSome() == o.isSome() && (isSome() && *p == *o.p);
     }
 
@@ -138,7 +138,7 @@ public:
      *          Otherwise, if call trace look like if_some -> if_none it's bad way, becouse if statement was Some that if_some function will be unwrapped value
      *          and statement will be changed to None, and later if_none will be executed too, becouse statement already is None
      */
-	QOption & if_some(std::function<void(type &&)> && fn) {
+	option & if_some(std::function<void(type &&)> && fn) {
         if(isSome()) {
 			fn(std::move(*p.release()));
         }
@@ -152,7 +152,7 @@ public:
      *          Otherwise, if call trace look like if_some -> if_none it's bad way, becouse if statement was Some that if_some function will be unwrapped value
      *          and statement will be changed to None, and later if_none will be executed too, becouse statement already is None
      */
-    QOption & if_none(std::function<void()> && fn) {
+	option & if_none(std::function<void()> && fn) {
         if(isNone())
             fn();
 
@@ -160,22 +160,22 @@ public:
     }
 
     /*! \brief  Returns value if statement is Some, or throws E type exception if statement is None. */
-    template< typename E = QUnwrapException>
-	type unwrap() {
+	template< typename E = unwrap_exception>
+	type && unwrap() {
         if(isNone())
             throw E("Option is None value");
 
-		return *p.release();
+		return std::move(*p.release());
     }
 
 
     /*! \brief  Returns value if statement is Some, or E type exception with text message if statement is None. */
-    template <typename E = QUnwrapException>
-	type expect (const char * text) {
+	template <typename E = unwrap_exception>
+	type && expect (const char * text) {
         if(isNone())
             throw E(text);
 
-		return *p.release();
+		return std::move(*p.release());
     }
 
     /*!
@@ -183,12 +183,12 @@ public:
      *  \arg    none_fn - std::function<value_t()> object - must not provide args and returns @e value_t value
      */
     template<typename none_callable>
-	type unwrap_or(none_callable && none_fn) {
+	type && unwrap_or(none_callable && none_fn) {
 		if(isNone()) {
-			p.reset(new(&value) type(std::forward<type>(none_fn())));
+			p.reset(new type(std::forward<type>(none_fn())));
 		}
 
-		return *p.release();
+		return std::move(*p.release());
     }
 
     /*!
@@ -207,40 +207,40 @@ public:
 
 
     /*! \brief  Returns value if statement is Some, or def_value if statement is None. */
-	type unwrap_def(const type & def_value) {
+	type && unwrap_def(const type & def_value) {
         if(isNone())
 			return def_value;
 
-		return *p.release();
+		return std::move(*p.release());
     }
 
 
     /*! \brief  Returns value if statement is Some, or def_value if statement is None. */
-	type unwrap_def(type && def_value) {
+	type && unwrap_def(type && def_value) {
 		if(isNone()) {
-			p.reset(new(&value) type(std::forward<type>(def_value)));
+			p.reset(new type(std::forward<type>(def_value)));
 		}
 
-		return *p.release();
+		return std::move(*p.release());
     }
 
 private:
-	std::unique_ptr<type> p;
 
     /*! \brief  aligned storage with @e keeping data of value. */
-	storage_type value;
+	std::unique_ptr<type> p;
+
 };
 
 template<typename T>
-QOption<T> Some(T && v)
+option<T> some_option(T && v)
 {
-    return QOption<T>(std::forward<T>(v));
+	return option<T>(std::forward<T>(v));
 }
 
 template<typename T>
-QOption<T> Some(const T & v)
+option<T> some_option(const T & v)
 {
-    return QOption<T>(v);
+	return option<T>(v);
 }
 
 #endif // QOPTION_H

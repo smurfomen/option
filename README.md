@@ -1,4 +1,4 @@
-QOption class provides functionality for force handling execution errors.
+option class provides functionality for force handling execution errors.
 It is a container class requires unboxing to get the stored value.
 ## Returning value
 Bad way:
@@ -13,11 +13,11 @@ MyClass * getMyClass() {
 Good way for example:
 
 ```C++
-QOption<MyClass*> getMyClass() {
+option<MyClass*> getMyClass() {
   if(expression)
      return new MyClass(args..);
 
-  return None();
+  return none_option();
 }
 ```
 ## Use cases
@@ -36,7 +36,7 @@ if(!option)
 auto option = getMyClass();
 if(option) {
     option.unwrap()->myClassFoo(args..); // equial MyClass * mc = ...; mc->myClassFoo(args...);
-    doSomething(option.unwrap()); // QUnwrapException will throw!
+    doSomething(option.unwrap()); // unwrap_exception will throw!
 }
 ```
 
@@ -44,7 +44,7 @@ if(option) {
 ```C++
 try {
     MyClass * mc = getMyClass().unwrap();
-} catch (QUnwrapException & ue) {
+} catch (unwrap_exception & ue) {
     // Option is None value
 }
 ```
@@ -56,11 +56,11 @@ try {
     // Option is None value
 }
 ```
-<br>Get some value or default value if QOption is not Some</br>
+<br>Get some value or default value if option is not Some</br>
 ```C++
 const char * connection = createConnectionString(params).unwrap_def("something default connection string");
 ```
-<br>Get some value or executing a nested lambda function and get the default value if QOption is not Some</br>
+<br>Get some value or executing a nested lambda function and get the default value if option is not Some</br>
 ```C++
 // this way do not overhead when some case and none default object will not be created
 const char * connection = createConnectionString(params).unwrap_or([]{ return "something default connection string"; });
@@ -69,7 +69,7 @@ const char * connection = createConnectionString(params).unwrap_or([]{ return "s
 ```C++
 try {
      MyClass * mc = getMyClass().expect("Something is wrong. Exception QUnwrapException will throw.");
-} catch (QUnwrapException & ue) {
+} catch (unwrap_exception & ue) {
     // Something is wrong. Exception QUnwrapException will throw.
 }
 ```
@@ -97,7 +97,7 @@ bool success = getObject().match(
 ```
 <br>Composing handling</br>
 ```C++
-QOption<MyClass*> option = getMyClass();
+option<MyClass*> option = getMyClass();
 option.if_some([&](MyClass * obj){
     foo(obj);
 }).if_none([]() {
